@@ -1,0 +1,21 @@
+# 開発用パッケージ
+ipython>=8.0.0
+jupyter>=1.0.0
+jupyterlab>=4.0.0
+notebook>=7.0.0
+
+# テスト・品質管理
+pytest>=7.0.0
+pytest-cov>=4.0.0
+black>=23.0.0
+flake8>=6.0.0
+pylint>=2.0.0
+mypy>=1.0.0
+pre-commit>=3.0.0
+
+# デバッグ
+ipdb>=0.13.0
+
+# ドキュメント
+sphinx>=5.0.0
+sphinx-rtd-theme>=1.0.0
