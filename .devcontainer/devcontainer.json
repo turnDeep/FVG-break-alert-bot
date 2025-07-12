@@ -9,5 +9,6 @@
         "ms-toolsai.jupyter"
       ]
     }
-  }
+  },
+  "forwardPorts": []
 }
