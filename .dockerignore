@@ -1,0 +1,65 @@
+# Git
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# 環境変数（セキュリティのため）
+.env
+.env.local
+
+# ログとキャッシュ
+*.log
+logs/
+.cache/
+.pytest_cache/
+
+# 結果ファイル
+optimization_results.png
+optimized_params.json
+*.csv
+
+# データベース
+*.db
+*.sqlite
+*.sqlite3
+
+# OS
+.DS_Store
+Thumbs.db
+
+# バックアップ
+*.bak
+*.backup
+
+# 一時ファイル
+tmp/
+temp/
+
+# ドキュメント（必要に応じて）
+docs/
+*.md
+
+# テスト
+tests/
+coverage/
+.coverage
+htmlcov/
