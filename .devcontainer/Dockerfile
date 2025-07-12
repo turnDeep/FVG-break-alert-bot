@@ -32,36 +32,24 @@ RUN apt-get update && apt-get install -y \
 RUN useradd -m -s /bin/bash vscode && \
     echo "vscode ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-# Pythonパッケージの事前インストール（キャッシュ効率化のため）
+# Pythonパッケージのインストール
 COPY requirements.txt /tmp/requirements.txt
-
-# 機械学習用パッケージを含むrequirements.txtのインストール
+COPY .devcontainer/requirements-dev.txt /tmp/requirements-dev.txt
 RUN pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r /tmp/requirements.txt && \
-    # 追加の開発ツール
-    pip install --no-cache-dir \
-    ipython \
-    jupyter \
-    jupyterlab \
-    pytest \
-    pytest-cov \
-    black \
-    flake8 \
-    pylint \
-    mypy \
-    pre-commit
-
-# Jupyter設定
-RUN jupyter notebook --generate-config && \
-    echo "c.NotebookApp.ip = '0.0.0.0'" >> ~/.jupyter/jupyter_notebook_config.py && \
-    echo "c.NotebookApp.allow_root = True" >> ~/.jupyter/jupyter_notebook_config.py && \
-    echo "c.NotebookApp.open_browser = False" >> ~/.jupyter/jupyter_notebook_config.py
+    pip install --no-cache-dir -r /tmp/requirements-dev.txt
 
 # 作業ディレクトリの所有権設定
 RUN chown -R vscode:vscode /workspace
 
 # ユーザーを切り替え
 USER vscode
+
+# Jupyter設定
+RUN jupyter notebook --generate-config && \
+    echo "c.NotebookApp.ip = '0.0.0.0'" >> ~/.jupyter/jupyter_notebook_config.py && \
+    echo "c.NotebookApp.allow_root = False" >> ~/.jupyter/jupyter_notebook_config.py && \
+    echo "c.NotebookApp.open_browser = False" >> ~/.jupyter/jupyter_notebook_config.py
 
 # Pythonパスの設定
 ENV PYTHONPATH=/workspace:$PYTHONPATH
