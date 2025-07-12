@@ -1,75 +1,13 @@
 {
-  "name": "FVG ML Optimizer Dev Container",
-  "dockerFile": "Dockerfile",
-  
-  // コンテナ設定
-  "runArgs": [
-    "--rm",
-    "--name", "fvg-ml-optimizer",
-    "--gpus", "all"  // GPUが利用可能な場合
-  ],
-  
-  // ポート転送（Jupyter等で使用する場合）
-  "forwardPorts": [8888, 6006],
-  
-  // 環境変数
-  "containerEnv": {
-    "PYTHONUNBUFFERED": "1",
-    "PYTHONDONTWRITEBYTECODE": "1"
-  },
-  
-  // ボリュームマウント
-  "mounts": [
-    "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached"
-  ],
-  
-  // デフォルトの作業ディレクトリ
-  "workspaceFolder": "/workspace",
-  
-  // コンテナ作成後のコマンド
-  "postCreateCommand": "pip install --upgrade pip && pip install -r requirements-dev.txt",
-  
-  // VSCode拡張機能
+  "name": "FVG ML Optimizer (Simple)",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "postCreateCommand": "pip install --upgrade pip && pip install -r requirements.txt && pip install jupyter ipython",
   "customizations": {
     "vscode": {
       "extensions": [
         "ms-python.python",
-        "ms-python.vscode-pylance",
-        "ms-python.black-formatter",
-        "ms-toolsai.jupyter",
-        "ms-toolsai.jupyter-keymap",
-        "ms-toolsai.jupyter-renderers",
-        "njpwerner.autodocstring",
-        "visualstudioexptteam.vscodeintellicode",
-        "redhat.vscode-yaml",
-        "yzhang.markdown-all-in-one",
-        "donjayamanne.githistory"
-      ],
-      
-      // VSCode設定
-      "settings": {
-        "python.defaultInterpreterPath": "/usr/local/bin/python",
-        "python.linting.enabled": true,
-        "python.linting.pylintEnabled": true,
-        "python.formatting.provider": "black",
-        "python.formatting.blackArgs": ["--line-length", "100"],
-        "editor.formatOnSave": true,
-        "editor.codeActionsOnSave": {
-          "source.organizeImports": true
-        },
-        "files.autoSave": "afterDelay",
-        "files.autoSaveDelay": 1000,
-        "terminal.integrated.defaultProfile.linux": "bash"
-      }
+        "ms-toolsai.jupyter"
+      ]
     }
-  },
-  
-  // ユーザー設定
-  "remoteUser": "vscode",
-  
-  // 機能設定
-  "features": {
-    "ghcr.io/devcontainers/features/git:1": {},
-    "ghcr.io/devcontainers/features/github-cli:1": {}
   }
 }
