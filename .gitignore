@@ -1,0 +1,139 @@
+# 環境変数ファイル（重要：トークンを含むため絶対に公開しない）
+
+.env
+.env.local
+.env.*.local
+
+# Python
+
+**pycache**/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter Notebook
+
+.ipynb_checkpoints
+
+# データベース（将来の拡張用）
+
+*.db
+*.sqlite
+*.sqlite3
+
+# ログファイル
+
+*.log
+logs/
+
+# チャート画像のキャッシュ
+
+charts/
+*.png
+*.jpg
+*.jpeg
+fvg_charts/
+
+# バックアップファイル
+
+*.bak
+*.backup
+*_backup.*
+
+# テスト関連
+
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# 一時ファイル
+
+temp/
+tmp/
+cache/
+
+# 監視リストとアラート履歴
+
+watchlist.json
+symbols.txt
+fvg_alerts.json
+resistance_alerts.json
+alert_history/
+
+# 設定ファイルのバックアップ
+
+config.json
+settings.json
+
+# バックテスト結果
+
+backtest_results/
+*.csv
+
+# セキュリティ
+
+*.pem
+*.key
+*.cert
+
+# システムファイル
+
+Thumbs.db
+desktop.ini
+
+# カスタムスクリプト
+
+scripts/
+custom/
+
+# ドキュメントビルド
+
+docs/_build/
+site/
+
+# パッケージマネージャー
+
+poetry.lock
+Pipfile.lock
+
+# FVG分析データ
+
+fvg_analysis/
+market_data/
