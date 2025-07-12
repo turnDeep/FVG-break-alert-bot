@@ -137,3 +137,20 @@ Pipfile.lock
 
 fvg_analysis/
 market_data/
+
+# ML最適化結果
+optimized_params.json
+optimization_results.png
+optuna_study.db
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Dev Container
+.devcontainer/workspace-mount*
