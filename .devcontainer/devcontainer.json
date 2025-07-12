@@ -27,7 +27,7 @@
   "workspaceFolder": "/workspace",
   
   // コンテナ作成後のコマンド
-  "postCreateCommand": "pip install --upgrade pip && pip install -r requirements.txt",
+  "postCreateCommand": "pip install --upgrade pip && pip install -r requirements-dev.txt",
   
   // VSCode拡張機能
   "customizations": {
