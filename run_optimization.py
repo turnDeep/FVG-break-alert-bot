@@ -4,7 +4,7 @@ ML最適化の実行スクリプト
 カスタムパラメータで最適化を実行する例
 """
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from ml_optimizer import FVGParameterOptimizer
 
 def main():
@@ -20,10 +20,14 @@ def main():
     max_symbols = int(os.getenv('MAX_SYMBOLS', 100))
     
     # 期間設定
-    train_start = os.getenv('TRAIN_START_DATE', '2022-01-01')
-    train_end = os.getenv('TRAIN_END_DATE', '2024-01-01')
-    test_start = os.getenv('TEST_START_DATE', '2024-01-01')
-    test_end = os.getenv('TEST_END_DATE', '2024-12-31')
+    today = datetime.now()
+    ten_years_ago = today - timedelta(days=365*10)
+    two_years_ago = today - timedelta(days=365*2)
+
+    train_start = os.getenv('TRAIN_START_DATE', ten_years_ago.strftime('%Y-%m-%d'))
+    train_end = os.getenv('TRAIN_END_DATE', two_years_ago.strftime('%Y-%m-%d'))
+    test_start = os.getenv('TEST_START_DATE', two_years_ago.strftime('%Y-%m-%d'))
+    test_end = os.getenv('TEST_END_DATE', today.strftime('%Y-%m-%d'))
     
     print("=" * 60)
     print("FVG Break Alert Bot - ML Parameter Optimization")

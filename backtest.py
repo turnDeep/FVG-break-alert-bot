@@ -15,7 +15,7 @@ class FVGBreakBacktest:
     def __init__(self, ma_period=200, fvg_min_gap=0.5,
                  resistance_lookback=20, breakout_threshold=1.005,
                  stop_loss_rate=0.02, target_profit_rate=0.05,
-                 ma_proximity_percent=0.05, use_weekly_sma=True):
+                 ma_proximity_percent=0.05):
         self.ma_period = ma_period
         self.fvg_min_gap = fvg_min_gap
         self.resistance_lookback = resistance_lookback
@@ -23,7 +23,6 @@ class FVGBreakBacktest:
         self.stop_loss_rate = stop_loss_rate
         self.target_profit_rate = target_profit_rate
         self.ma_proximity_percent = ma_proximity_percent
-        self.use_weekly_sma = use_weekly_sma
 
     def detect_fvg(self, df: pd.DataFrame, index: int) -> Optional[Dict]:
         """FVG検出を改善"""
@@ -195,12 +194,12 @@ class FVGBreakBacktest:
                     active_resistance = None
 
             # 基本条件チェック
-            if pd.isna(daily_ma) or (self.use_weekly_sma and pd.isna(weekly_sma)):
+            if pd.isna(daily_ma) or pd.isna(weekly_sma):
                 continue
             debug_info['days_with_valid_ma'] += 1
 
             # 条件1: 週足SMA200以上
-            if self.use_weekly_sma and current_price <= weekly_sma:
+            if current_price <= weekly_sma:
                 continue
             debug_info['days_above_weekly_sma'] += 1
 

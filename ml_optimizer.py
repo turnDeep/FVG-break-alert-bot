@@ -89,8 +89,7 @@ class FVGParameterOptimizer:
             breakout_threshold=params['breakout_threshold'],
             stop_loss_rate=params['stop_loss_rate'],
             target_profit_rate=params['target_profit_rate'],
-            ma_proximity_percent=params['ma_proximity_percent'],
-            use_weekly_sma=params['use_weekly_sma']
+            ma_proximity_percent=params['ma_proximity_percent']
         )
 
         # 各銘柄でバックテスト
@@ -132,7 +131,6 @@ class FVGParameterOptimizer:
             'stop_loss_rate': trial.suggest_float('stop_loss_rate', 0.01, 0.05, step=0.005),
             'target_profit_rate': trial.suggest_float('target_profit_rate', 0.01, 0.1, step=0.01),  # 小さい利益も狙う
             'ma_proximity_percent': trial.suggest_float('ma_proximity_percent', 0.05, 0.20, step=0.05),  # 新パラメータ
-            'use_weekly_sma': trial.suggest_categorical('use_weekly_sma', [True, False])  # 週足条件の有無
         }
 
         # 訓練セットで評価
@@ -262,7 +260,6 @@ class FVGParameterOptimizer:
         print(f"STOP_LOSS_RATE={self.best_params['stop_loss_rate']}")
         print(f"TARGET_PROFIT_RATE={self.best_params['target_profit_rate']}")
         print(f"MA_PROXIMITY_PERCENT={self.best_params['ma_proximity_percent']}")
-        print(f"USE_WEEKLY_SMA={self.best_params['use_weekly_sma']}")
 
     def plot_optimization_history(self):
         """最適化履歴をプロット"""
