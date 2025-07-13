@@ -77,34 +77,54 @@ class FVGBreakBacktest:
 
     def run_backtest(self, symbol: str, start_date: str, end_date: str) -> Dict:
         """バックテストを実行"""
-        # データ取得
+        # データ取得期間をMA期間分だけ過去に広げる
+        start_date_dt = pd.to_datetime(start_date)
+        # 週足MAのために、ma_period週 * 7日分のデータを余分に取得
+        fetch_start_date = start_date_dt - timedelta(days=self.ma_period * 7)
+
         stock = yf.Ticker(symbol)
-        df_daily = stock.history(start=start_date, end=end_date)
-        df_weekly = stock.history(start=start_date, end=end_date, interval="1wk")
-        
-        if df_daily.empty or df_weekly.empty:
+        df_daily_full = stock.history(start=fetch_start_date, end=end_date)
+        df_weekly_full = stock.history(start=fetch_start_date, end=end_date, interval="1wk")
+
+        if df_daily_full.empty or df_weekly_full.empty:
             return {"error": "データ取得失敗"}
-        
+
         # 移動平均計算
-        df_daily['MA200'] = df_daily['Close'].rolling(window=self.ma_period).mean()
-        df_weekly['SMA200'] = df_weekly['Close'].rolling(window=self.ma_period).mean()
+        df_daily_full['MA200'] = df_daily_full['Close'].rolling(window=self.ma_period).mean()
+        df_weekly_full['SMA200'] = df_weekly_full['Close'].rolling(window=self.ma_period).mean()
+
+        # 週次SMAを日次データにマージ (より堅牢な方法)
+        df_daily_full.index = df_daily_full.index.tz_localize(None)
+        df_weekly_full.index = df_weekly_full.index.tz_localize(None)
+
+        df_daily_full_reset = df_daily_full.reset_index()
+        df_weekly_full_reset = df_weekly_full.reset_index()
+
+        df_daily_full_reset['Week_Start'] = pd.to_datetime(df_daily_full_reset['Date']).dt.to_period('W-MON').apply(lambda r: r.start_time)
+        df_weekly_full_reset['Week_Start'] = pd.to_datetime(df_weekly_full_reset['Date']).dt.to_period('W-MON').apply(lambda r: r.start_time)
+
+        df_daily_full = pd.merge(df_daily_full_reset,
+                                 df_weekly_full_reset[['Week_Start', 'SMA200']],
+                                 on='Week_Start',
+                                 how='left',
+                                 suffixes=('', '_weekly'))
+
+        df_daily_full = df_daily_full.set_index('Date')
+        df_daily_full.rename(columns={'SMA200': 'Weekly_SMA200'}, inplace=True)
+        df_daily_full['Weekly_SMA200'] = df_daily_full['Weekly_SMA200'].ffill()
         
-        # 週次SMAを日次データに結合
-        df_daily['Weekly_SMA200'] = np.nan
-        for current_date_idx in df_daily.index: # Renamed variable to avoid conflict
-            week_start = current_date_idx - timedelta(days=current_date_idx.weekday())
-            if week_start in df_weekly.index:
-                df_daily.loc[current_date_idx, 'Weekly_SMA200'] = df_weekly.loc[week_start, 'SMA200']
-        df_daily['Weekly_SMA200'] = df_daily['Weekly_SMA200'].ffill()
+        # 元の期間にデータをトリム
+        df_daily = df_daily_full.loc[start_date_dt:end_date].copy()
         
         # トレード記録
-        fvg_trades = []  # FVGエントリー
-        resistance_trades = []  # レジスタンス突破エントリー
+        fvg_trades = []
+        resistance_trades = []
         active_fvg = None
         active_resistance = None
         
         # バックテスト実行
-        for i in range(self.ma_period + 3, len(df_daily)):
+        # ループ開始インデックスを修正し、NaNチェックをループ内で行う
+        for i in range(1, len(df_daily)): # 1から開始してi-1にアクセスできるようにする
             current_date = df_daily.index[i]
             current_price = df_daily['Close'].iloc[i]
             daily_ma = df_daily['MA200'].iloc[i]
