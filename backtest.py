@@ -133,10 +133,9 @@ class FVGBreakBacktest:
         df_daily = df_daily_full.loc[start_date_dt:end_date].copy()
         
         # トレード記録
-        fvg_trades = []
-        resistance_trades = []
-        active_fvg = None
-        active_resistance = None
+        strategy1_trades = [] # FVG
+        strategy2_trades = [] # FVG + Resistance
+        active_s1_trade = None
 
         # デバッグ情報を記録
         debug_info = {
@@ -149,176 +148,135 @@ class FVGBreakBacktest:
         }
         
         # バックテスト実行
-        # ループ開始インデックスを修正し、NaNチェックをループ内で行う
-        for i in range(1, len(df_daily)): # 1から開始してi-1にアクセスできるようにする
+        for i in range(1, len(df_daily)):
             current_date = df_daily.index[i]
             current_price = df_daily['Close'].iloc[i]
             daily_ma = df_daily['MA200'].iloc[i]
             weekly_sma = df_daily['Weekly_SMA200'].iloc[i]
 
-            # ポジション管理
-            if active_fvg:
-                # ストップロスチェック
-                if current_price <= active_fvg['stop_loss']:
-                    active_fvg['exit_date'] = current_date
-                    active_fvg['exit_price'] = current_price
-                    active_fvg['return'] = (current_price - active_fvg['entry_price']) / active_fvg['entry_price']
-                    active_fvg['exit_reason'] = 'ストップロス'
-                    fvg_trades.append(active_fvg)
-                    active_fvg = None
-                # 利確チェック
-                elif current_price >= active_fvg['target']:
-                    active_fvg['exit_date'] = current_date
-                    active_fvg['exit_price'] = current_price
-                    active_fvg['return'] = (current_price - active_fvg['entry_price']) / active_fvg['entry_price']
-                    active_fvg['exit_reason'] = '利確'
-                    fvg_trades.append(active_fvg)
-                    active_fvg = None
+            # --- ポジション管理 ---
+            if active_s1_trade:
+                # 戦略2の条件（レジスタンス突破）をチェック
+                if not active_s1_trade.get('s2_triggered'):
+                    resistance_levels = self.find_resistance_levels(df_daily, i)
+                    for resistance in resistance_levels:
+                        if current_price > resistance * self.breakout_threshold and df_daily['Close'].iloc[i-1] <= resistance:
+                            debug_info['resistance_breaks_detected'] += 1
+                            active_s1_trade['s2_triggered'] = True
 
-            if active_resistance:
-                # ストップロスチェック
-                if current_price <= active_resistance['stop_loss']:
-                    active_resistance['exit_date'] = current_date
-                    active_resistance['exit_price'] = current_price
-                    active_resistance['return'] = (current_price - active_resistance['entry_price']) / active_resistance['entry_price']
-                    active_resistance['exit_reason'] = 'ストップロス'
-                    resistance_trades.append(active_resistance)
-                    active_resistance = None
-                # 利確チェック
-                elif current_price >= active_resistance['target']:
-                    active_resistance['exit_date'] = current_date
-                    active_resistance['exit_price'] = current_price
-                    active_resistance['return'] = (current_price - active_resistance['entry_price']) / active_resistance['entry_price']
-                    active_resistance['exit_reason'] = '利確'
-                    resistance_trades.append(active_resistance)
-                    active_resistance = None
+                            s2_trade = active_s1_trade.copy()
+                            s2_trade['entry_date_s2'] = current_date
+                            s2_trade['entry_price_s2'] = current_price
+                            s2_trade['resistance'] = resistance
+                            strategy2_trades.append(s2_trade)
+                            break
 
-            # 基本条件チェック
-            if pd.isna(daily_ma) or pd.isna(weekly_sma):
-                continue
-            debug_info['days_with_valid_ma'] += 1
+                # 決済条件のチェック
+                exit_reason = None
+                if current_price <= active_s1_trade['stop_loss']:
+                    exit_reason = 'ストップロス'
+                elif current_price >= active_s1_trade['target']:
+                    exit_reason = '利確'
 
-            # 条件1: 週足SMA200以上
-            if current_price <= weekly_sma:
-                continue
-            debug_info['days_above_weekly_sma'] += 1
+                if exit_reason:
+                    active_s1_trade['exit_date'] = current_date
+                    active_s1_trade['exit_price'] = current_price
+                    active_s1_trade['return'] = (current_price - active_s1_trade['entry_price']) / active_s1_trade['entry_price']
+                    active_s1_trade['exit_reason'] = exit_reason
+                    strategy1_trades.append(active_s1_trade)
+                    active_s1_trade = None
 
-            # 条件2: 日足MA200付近
-            ma_distance = abs(current_price - daily_ma) / daily_ma
-            if ma_distance > self.ma_proximity_percent:
-                continue
-            debug_info['days_near_daily_ma'] += 1
+            # --- 新規エントリー条件 ---
+            if not active_s1_trade:
+                # 基本条件
+                if pd.isna(daily_ma) or pd.isna(weekly_sma):
+                    continue
+                debug_info['days_with_valid_ma'] += 1
 
-            # FVG検出
-            if not active_fvg:
+                if current_price <= weekly_sma:
+                    continue
+                debug_info['days_above_weekly_sma'] += 1
+
+                ma_distance = abs(current_price - daily_ma) / daily_ma
+                if ma_distance > self.ma_proximity_percent:
+                    continue
+                debug_info['days_near_daily_ma'] += 1
+
+                # 戦略1のトリガー（FVG検出）
                 fvg = self.detect_fvg(df_daily, i)
-                if fvg:
+                if fvg and fvg['type'] == 'bullish': # ブルッシュFVGのみを対象
                     debug_info['fvg_detected_count'] += 1
-                    # FVGエントリー
-                    active_fvg = {
+                    active_s1_trade = {
                         'symbol': symbol,
                         'entry_date': current_date,
                         'entry_price': current_price,
                         'fvg_info': fvg,
                         'stop_loss': fvg['gap_bottom'] * (1 - self.stop_loss_rate),
                         'target': current_price * (1 + self.target_profit_rate),
-                        'daily_ma': daily_ma,
-                        'weekly_sma': weekly_sma
+                        's2_triggered': False
                     }
 
-            # レジスタンス突破チェック
-            if not active_resistance:
-                resistance_levels = self.find_resistance_levels(df_daily, i)
-                for resistance in resistance_levels:
-                    if current_price > resistance * self.breakout_threshold:
-                        # 前日がレジスタンス以下かチェック
-                        if df_daily['Close'].iloc[i-1] <= resistance:
-                            debug_info['resistance_breaks_detected'] += 1
-                            # レジスタンス突破エントリー
-                            active_resistance = {
-                                'symbol': symbol,
-                                'entry_date': current_date,
-                                'entry_price': current_price,
-                                'resistance': resistance,
-                                'stop_loss': resistance * (1 - self.stop_loss_rate),
-                                'target': current_price * (1 + self.target_profit_rate),
-                                'daily_ma': daily_ma,
-                                'weekly_sma': weekly_sma,
-                                'had_fvg': active_fvg is not None
-                            }
-                            break
-        
         # 未決済ポジションの処理
-        if active_fvg:
-            active_fvg['exit_date'] = df_daily.index[-1]
-            active_fvg['exit_price'] = df_daily['Close'].iloc[-1]
-            active_fvg['return'] = (active_fvg['exit_price'] - active_fvg['entry_price']) / active_fvg['entry_price']
-            active_fvg['exit_reason'] = '期間終了'
-            fvg_trades.append(active_fvg)
-        
-        if active_resistance:
-            active_resistance['exit_date'] = df_daily.index[-1]
-            active_resistance['exit_price'] = df_daily['Close'].iloc[-1]
-            active_resistance['return'] = (active_resistance['exit_price'] - active_resistance['entry_price']) / active_resistance['entry_price']
-            active_resistance['exit_reason'] = '期間終了'
-            resistance_trades.append(active_resistance)
+        if active_s1_trade:
+            active_s1_trade['exit_date'] = df_daily.index[-1]
+            active_s1_trade['exit_price'] = df_daily['Close'].iloc[-1]
+            active_s1_trade['return'] = (active_s1_trade['exit_price'] - active_s1_trade['entry_price']) / active_s1_trade['entry_price']
+            active_s1_trade['exit_reason'] = '期間終了'
+            strategy1_trades.append(active_s1_trade)
         
         # 結果集計
-        return self.calculate_statistics(symbol, start_date, end_date, fvg_trades, resistance_trades, debug_info)
+        return self.calculate_statistics(symbol, start_date, end_date, strategy1_trades, strategy2_trades, debug_info)
 
     def calculate_statistics(self, symbol: str, start_date: str, end_date: str,
-                             fvg_trades: List[Dict], resistance_trades: List[Dict], debug_info: Dict) -> Dict:
+                             strategy1_trades: List[Dict], strategy2_trades: List[Dict], debug_info: Dict) -> Dict:
         """トレード結果の統計を計算"""
-        # FVG統計
-        fvg_returns = [t['return'] for t in fvg_trades] if fvg_trades else []
-        fvg_wins = [r for r in fvg_returns if r > 0]
+
+        # 戦略1 (FVG) の統計
+        s1_returns = [t['return'] for t in strategy1_trades if 'return' in t]
+        s1_wins = [r for r in s1_returns if r > 0]
         
-        # レジスタンス統計
-        resistance_returns = [t['return'] for t in resistance_trades] if resistance_trades else []
-        resistance_wins = [r for r in resistance_returns if r > 0]
-        
-        # FVG→レジスタンスの成功率を計算
-        fvg_to_resistance = 0
-        combined_wins = 0
-        for fvg_trade in fvg_trades:
-            # FVGエントリー後にレジスタンス突破があったかチェック
-            for res_trade in resistance_trades:
-                if (res_trade['entry_date'] > fvg_trade['entry_date'] and
-                    res_trade['entry_date'] < fvg_trade['exit_date'] and
-                    res_trade.get('had_fvg', False)):
-                    fvg_to_resistance += 1
-                    if fvg_trade['return'] > 0 and res_trade['return'] > 0:
-                        combined_wins += 1
+        # 戦略2 (FVG -> Resistance) の統計
+        # 戦略2のトレードは、戦略1のトレード結果を継承する
+        s2_final_trades = []
+        for s2_trade in strategy2_trades:
+            # 対応するs1トレードを見つける
+            for s1_trade in strategy1_trades:
+                if s1_trade['entry_date'] == s2_trade['entry_date']:
+                    if 'return' in s1_trade:
+                        final_trade = s2_trade.copy()
+                        final_trade['return'] = s1_trade['return']
+                        s2_final_trades.append(final_trade)
                     break
         
-        # 全トレードの統計
-        all_returns = fvg_returns + resistance_returns
+        s2_returns = [t['return'] for t in s2_final_trades]
+        s2_wins = [r for r in s2_returns if r > 0]
+
+        # 全体の統計（戦略1がベース）
+        total_trades = len(strategy1_trades)
+        all_returns = s1_returns
 
         return {
             'symbol': symbol,
             'period': f"{start_date} - {end_date}",
-
-            # FVG統計
-            'fvg_count': len(fvg_trades),
-            'fvg_win_rate': len(fvg_wins) / len(fvg_trades) * 100 if fvg_trades else 0,
-            'fvg_avg_gain': np.mean(fvg_returns) * 100 if fvg_returns else 0,
-            'fvg_to_resistance_rate': fvg_to_resistance / len(fvg_trades) * 100 if fvg_trades else 0,
-
-            # レジスタンス統計
-            'resistance_breaks': len(resistance_trades),
-            'resistance_success_rate': len(resistance_wins) / len(resistance_trades) * 100 if resistance_trades else 0,
-            'resistance_avg_return': np.mean(resistance_returns) * 100 if resistance_returns else 0,
-
-            # 組み合わせ統計
-            'combined_win_rate': combined_wins / fvg_to_resistance * 100 if fvg_to_resistance > 0 else 0,
-            'total_trades': len(fvg_trades) + len(resistance_trades),
+            'total_trades': total_trades,
             'avg_return': np.mean(all_returns) * 100 if all_returns else 0,
             'max_profit': max(all_returns) * 100 if all_returns else 0,
             'max_loss': min(all_returns) * 100 if all_returns else 0,
 
-            # 詳細データ
-            'fvg_trades': fvg_trades,
-            'resistance_trades': resistance_trades,
+            's1_stats': {
+                'count': len(strategy1_trades),
+                'win_rate': len(s1_wins) / len(strategy1_trades) * 100 if strategy1_trades else 0,
+                'avg_return': np.mean(s1_returns) * 100 if s1_returns else 0,
+            },
+            's2_stats': {
+                'count': len(strategy2_trades),
+                'conversion_rate': len(strategy2_trades) / len(strategy1_trades) * 100 if strategy1_trades else 0,
+                'win_rate': len(s2_wins) / len(s2_final_trades) * 100 if s2_final_trades else 0,
+                'avg_return': np.mean(s2_returns) * 100 if s2_returns else 0,
+            },
+
+            'strategy1_trades': strategy1_trades,
+            'strategy2_trades': strategy2_trades,
             'debug_info': debug_info
         }
 
@@ -327,56 +285,40 @@ class FVGBreakBacktest:
         if result.get('error'):
             return f"エラー: {result['error']}"
     
+        s1 = result['s1_stats']
+        s2 = result['s2_stats']
+
         report = f"""
-📊 FVGブレイク戦略 バックテスト結果 - {result['symbol']}
+📊 FVGベース戦略 バックテスト結果 - {result['symbol']}
 期間: {result['period']}
 ━━━━━━━━━━━━━━━━━━━━━━━━
 
-🔵 FVGアラート統計:
-• 検出数: {result['fvg_count']}回
-• 勝率: {result['fvg_win_rate']:.1f}%
-• 平均リターン: {result['fvg_avg_gain']:.2f}%
-• レジスタンス到達率: {result['fvg_to_resistance_rate']:.1f}%
+📈 戦略1: FVG検出
+• トレード数: {s1['count']}回
+• 勝率: {s1['win_rate']:.1f}%
+• 平均リターン: {s1['avg_return']:.2f}%
 
-🟢 レジスタンス突破統計:
-• 突破数: {result['resistance_breaks']}回
-• 成功率: {result['resistance_success_rate']:.1f}%
-• 平均リターン: {result['resistance_avg_return']:.2f}%
+🚀 戦略2: FVG検出 → レジスタンス突破
+• 転換率 (S1→S2): {s2['conversion_rate']:.1f}%
+• トレード数: {s2['count']}回
+• 勝率: {s2['win_rate']:.1f}%
+• 平均リターン: {s2['avg_return']:.2f}% (S1エントリーからの最終リターン)
 
-💰 2段階戦略パフォーマンス:
-• FVG→突破の勝率: {result['combined_win_rate']:.1f}%
+💰 全体パフォーマンス (戦略1ベース):
 • 総トレード数: {result['total_trades']}回
 • 平均リターン: {result['avg_return']:.2f}%
 • 最大利益: {result['max_profit']:.2f}%
 • 最大損失: {result['max_loss']:.2f}%
 
-📋 最近のトレード例:
+📋 最近のトレード例 (戦略1):
 """
         # 最新のトレード例を表示
-        all_trades = []
-        for trade in result['fvg_trades'][-3:]:
-            all_trades.append({
-                'type': 'FVG',
-                'entry_date': trade['entry_date'],
-                'exit_date': trade['exit_date'],
-                'return': trade['return']
-            })
-
-        for trade in result['resistance_trades'][-3:]:
-            all_trades.append({
-                'type': 'Resistance',
-                'entry_date': trade['entry_date'],
-                'exit_date': trade['exit_date'],
-                'return': trade['return']
-            })
-
-        # 日付順にソート
-        all_trades.sort(key=lambda x: x['entry_date'], reverse=True)
-
-        for trade in all_trades[:5]:
-            report += f"\n• [{trade['type']}] {trade['entry_date'].strftime('%Y-%m-%d')} "
+        for trade in result['strategy1_trades'][-5:]:
+            outcome = "✅" if trade.get('return', 0) > 0 else "❌"
+            s2_marker = "🚀" if trade.get('s2_triggered') else ""
+            report += f"\n• {outcome} {trade['entry_date'].strftime('%Y-%m-%d')} "
             report += f"→ {trade['exit_date'].strftime('%Y-%m-%d')}: "
-            report += f"{trade['return']*100:.1f}%"
+            report += f"{trade.get('return', 0)*100:.1f}% {s2_marker}"
 
         return report
 

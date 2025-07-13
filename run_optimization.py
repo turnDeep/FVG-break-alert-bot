@@ -90,15 +90,19 @@ def main():
         if test_results.get('error'):
             print(f"エラー: {test_results['error']}")
         else:
+            s1 = test_results['s1_stats']
+            s2 = test_results['s2_stats']
             print(f"対象銘柄数: {test_results['symbols_tested']} (うちエラー: {test_results['symbols_with_errors']})")
-            print(f"総トレード数: {test_results['total_trades']} 回")
-            print(f"  - FVGトレード: {test_results['total_fvg_trades']} 回")
-            print(f"  - レジスタンス突破: {test_results['total_resistance_trades']} 回")
-            print(f"勝率: {test_results['win_rate']:.2f}%")
-            print(f"平均リターン: {test_results['avg_return_percent']:.2f}%")
-            print(f"プロフィットファクター: {test_results['profit_factor']:.2f}")
-            print(f"最大利益: {test_results['max_profit_percent']:.2f}%")
-            print(f"最大損失: {test_results['max_loss_percent']:.2f}%")
+            print("\n--- 戦略1: FVG検出 ---")
+            print(f"トレード数: {s1['count']} 回")
+            print(f"勝率: {s1['win_rate']:.2f}%")
+            print(f"平均リターン: {s1['avg_return']:.2f}%")
+
+            print("\n--- 戦略2: FVG検出 → レジスタンス突破 ---")
+            print(f"転換率 (S1→S2): {s2['conversion_rate']:.2f}%")
+            print(f"トレード数: {s2['count']} 回")
+            print(f"勝率: {s2['win_rate']:.2f}%")
+            print(f"平均リターン: {s2['avg_return']:.2f}% (S1エントリーからの最終リターン)")
 
         print("\n結果ファイル:")
         print("  - optimized_params.json (最適化パラメータ)")
