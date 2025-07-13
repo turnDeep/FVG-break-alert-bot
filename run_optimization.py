@@ -17,12 +17,12 @@ def main():
     
     # 期間設定
     today = datetime.now()
-    ten_years_ago = today - timedelta(days=365*10)
-    two_years_ago = today - timedelta(days=365*2)
+    three_years_ago = today - timedelta(days=365*3)
+    one_year_ago = today - timedelta(days=365*1)
 
-    train_start = os.getenv('TRAIN_START_DATE', ten_years_ago.strftime('%Y-%m-%d'))
-    train_end = os.getenv('TRAIN_END_DATE', two_years_ago.strftime('%Y-%m-%d'))
-    test_start = os.getenv('TEST_START_DATE', two_years_ago.strftime('%Y-%m-%d'))
+    train_start = os.getenv('TRAIN_START_DATE', three_years_ago.strftime('%Y-%m-%d'))
+    train_end = os.getenv('TRAIN_END_DATE', one_year_ago.strftime('%Y-%m-%d'))
+    test_start = os.getenv('TEST_START_DATE', one_year_ago.strftime('%Y-%m-%d'))
     test_end = os.getenv('TEST_END_DATE', today.strftime('%Y-%m-%d'))
     
     print("=" * 60)
