@@ -104,6 +104,10 @@ def main():
         print("  - optimized_params.json (最適化パラメータ)")
         print("  - optimization_results.png (最適化過程)")
         
+        # サンプルチャート作成
+        optimizer.create_example_chart(test_start, test_end)
+        print("  - example_trade_chart.png (戦略2成功例)")
+
     except Exception as e:
         print(f"\n❌ エラーが発生しました: {e}")
         import traceback
