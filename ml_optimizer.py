@@ -37,9 +37,16 @@ class FVGParameterOptimizer:
             return ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK-B', 'JPM', 'JNJ']
 
     def calculate_score(self, result):
-        """最適化のスコアを計算（シャープレシオベース）"""
+        """より柔軟なスコア計算"""
+        # トレードがない場合でも、条件を満たした回数で部分点を与える
         if result['total_trades'] == 0:
-            return -1000  # トレードなしはペナルティ
+            # デバッグ情報から部分点を計算
+            debug_info = result.get('debug_info', {})
+            partial_score = (
+                debug_info.get('fvg_detected_count', 0) * 0.1 +
+                debug_info.get('resistance_breaks_detected', 0) * 0.2
+            )
+            return partial_score - 100  # 基本的にはペナルティだが、完全に-1000ではない
 
         # 基本メトリクス
         avg_return = result['avg_return']
@@ -81,7 +88,9 @@ class FVGParameterOptimizer:
             resistance_lookback=params['resistance_lookback'],
             breakout_threshold=params['breakout_threshold'],
             stop_loss_rate=params['stop_loss_rate'],
-            target_profit_rate=params['target_profit_rate']
+            target_profit_rate=params['target_profit_rate'],
+            ma_proximity_percent=params['ma_proximity_percent'],
+            use_weekly_sma=params['use_weekly_sma']
         )
 
         # 各銘柄でバックテスト
@@ -114,15 +123,16 @@ class FVGParameterOptimizer:
         return final_score
 
     def objective(self, trial, train_symbols, val_symbols, start_date, end_date):
-        """Optunaの目的関数"""
-        # パラメータの探索範囲
+        """探索範囲を拡大"""
         params = {
-            'ma_period': trial.suggest_int('ma_period', 50, 300, step=50),
-            'fvg_min_gap': trial.suggest_float('fvg_min_gap', 0.1, 2.0, step=0.1),
-            'resistance_lookback': trial.suggest_int('resistance_lookback', 10, 40, step=5),
-            'breakout_threshold': trial.suggest_float('breakout_threshold', 1.001, 1.02, step=0.001),
+            'ma_period': trial.suggest_int('ma_period', 20, 200, step=10),
+            'fvg_min_gap': trial.suggest_float('fvg_min_gap', 0.1, 1.0, step=0.1),  # 上限を下げる
+            'resistance_lookback': trial.suggest_int('resistance_lookback', 5, 30, step=5),
+            'breakout_threshold': trial.suggest_float('breakout_threshold', 1.0, 1.01, step=0.001),  # より小さい値も試す
             'stop_loss_rate': trial.suggest_float('stop_loss_rate', 0.01, 0.05, step=0.005),
-            'target_profit_rate': trial.suggest_float('target_profit_rate', 0.02, 0.1, step=0.01)
+            'target_profit_rate': trial.suggest_float('target_profit_rate', 0.01, 0.1, step=0.01),  # 小さい利益も狙う
+            'ma_proximity_percent': trial.suggest_float('ma_proximity_percent', 0.05, 0.20, step=0.05),  # 新パラメータ
+            'use_weekly_sma': trial.suggest_categorical('use_weekly_sma', [True, False])  # 週足条件の有無
         }
 
         # 訓練セットで評価
@@ -251,6 +261,8 @@ class FVGParameterOptimizer:
         print(f"BREAKOUT_THRESHOLD={self.best_params['breakout_threshold']}")
         print(f"STOP_LOSS_RATE={self.best_params['stop_loss_rate']}")
         print(f"TARGET_PROFIT_RATE={self.best_params['target_profit_rate']}")
+        print(f"MA_PROXIMITY_PERCENT={self.best_params['ma_proximity_percent']}")
+        print(f"USE_WEEKLY_SMA={self.best_params['use_weekly_sma']}")
 
     def plot_optimization_history(self):
         """最適化履歴をプロット"""
