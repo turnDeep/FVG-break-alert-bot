@@ -10,10 +10,6 @@ from ml_optimizer import FVGParameterOptimizer
 def main():
     """メイン実行関数"""
     
-    # 環境変数から設定を読み込み（.env.mlファイルがある場合）
-    from dotenv import load_dotenv
-    load_dotenv('.env.ml')  # ML専用の環境変数ファイル
-    
     # 最適化パラメータ
     n_trials = int(os.getenv('OPTUNA_N_TRIALS', 100))
     n_jobs = int(os.getenv('OPTUNA_N_JOBS', 4))
