@@ -36,10 +36,13 @@ BOT_CHANNEL_NAME = os.getenv("BOT_CHANNEL_NAME", "fvg-break-alerts") # Corrected
 SCAN_INTERVAL = int(os.getenv("SCAN_INTERVAL", 15))  # S&P500全体のため15分に延長 # Corrected fancy quotes
 
 # テクニカル設定
-MA_PERIOD = int(os.getenv("MA_PERIOD", 200)) # Corrected fancy quotes
-FVG_MIN_GAP_PERCENT = float(os.getenv("FVG_MIN_GAP_PERCENT", 0.5)) # Corrected fancy quotes
-RESISTANCE_LOOKBACK = int(os.getenv("RESISTANCE_LOOKBACK", 20)) # Corrected fancy quotes
-BREAKOUT_THRESHOLD = float(os.getenv("BREAKOUT_THRESHOLD", 1.005)) # Corrected fancy quotes
+MA_PERIOD = int(os.getenv("MA_PERIOD", 200))
+FVG_MIN_GAP_PERCENT = float(os.getenv("FVG_MIN_GAP_PERCENT", 0.5))
+RESISTANCE_LOOKBACK = int(os.getenv("RESISTANCE_LOOKBACK", 20))
+BREAKOUT_THRESHOLD = float(os.getenv("BREAKOUT_THRESHOLD", 1.005))
+STOP_LOSS_RATE = float(os.getenv("STOP_LOSS_RATE", 0.02))
+TARGET_PROFIT_RATE = float(os.getenv("TARGET_PROFIT_RATE", 0.05))
+MA_PROXIMITY_PERCENT = float(os.getenv("MA_PROXIMITY_PERCENT", 0.05))
 
 # グローバル変数
 watched_symbols = set()  # S&P500銘柄で初期化
@@ -199,6 +202,11 @@ class StockAnalyzer:
         resistance_levels = StockAnalyzer.find_resistance_levels(df_daily, RESISTANCE_LOOKBACK)
 
         # 基本条件チェック
+        ma_distance = abs(current_price - daily_ma200) / daily_ma200
+        is_above_weekly_sma = current_price > weekly_sma200
+        is_near_daily_ma = ma_distance < MA_PROXIMITY_PERCENT
+        is_fvg_detected = fvg_info is not None and fvg_info['type'] == 'bullish'
+
         result = {
             'symbol': symbol,
             'current_price': current_price,
@@ -209,33 +217,28 @@ class StockAnalyzer:
             'resistance_levels': resistance_levels,
             'fvg_info': fvg_info,
             'conditions': {
-                'above_weekly_sma': current_price > weekly_sma200,
-                'near_daily_ma': abs(current_price - daily_ma200) / daily_ma200 < 0.05,
-                'fvg_detected': fvg_info is not None,
+                'above_weekly_sma': is_above_weekly_sma,
+                'near_daily_ma': is_near_daily_ma,
+                'fvg_detected': is_fvg_detected,
                 'resistance_break': False,
                 'broken_resistance': None
-            }
+            },
+            'signal_type': None
         }
 
-        # レジスタンス突破チェック
-        for resistance in resistance_levels:
-            if current_price > resistance * BREAKOUT_THRESHOLD:
-                if len(df_daily) > 1 and df_daily['Close'].iloc[-2] <= resistance:
-                    result['conditions']['resistance_break'] = True
-                    result['conditions']['broken_resistance'] = resistance
-                    break
+        # シグナルタイプを判定（2段階戦略）
+        if is_above_weekly_sma and is_near_daily_ma and is_fvg_detected:
+            # 戦略1の条件成立
+            result['signal_type'] = 's1_fvg'
 
-        # シグナルタイプを判定
-        if result['conditions']['above_weekly_sma'] and result['conditions']['near_daily_ma']:
-            if result['conditions']['fvg_detected']:
-                result['signal_type'] = 'fvg'
-            if result['conditions']['resistance_break']:
-                if 'signal_type' in result and result['signal_type'] == 'fvg':
-                    result['signal_type'] = 'both'
-                else:
-                    result['signal_type'] = 'resistance'
-        else:
-            result['signal_type'] = None
+            # 戦略2の条件（レジスタンス突破）をチェック
+            for resistance in resistance_levels:
+                if current_price > resistance * BREAKOUT_THRESHOLD:
+                    if len(df_daily) > 1 and df_daily['Close'].iloc[-2] <= resistance:
+                        result['conditions']['resistance_break'] = True
+                        result['conditions']['broken_resistance'] = resistance
+                        result['signal_type'] = 's2_resistance_break' # S2が成立すれば上書き
+                        break
 
         return result
 
@@ -352,146 +355,102 @@ async def setup_guild(guild):
         print(f"サーバー '{guild.name}' の設定完了。アラートチャンネル: #{alert_channel.name}")
 
 def create_fvg_alert_embed(result):
-    """FVGアラート用のEmbed（第1アラート）"""
+    """戦略1（FVG検出）のアラート用Embed"""
     symbol = result["symbol"]
     fvg = result["fvg_info"]
-
-    # 企業情報を取得
-    try:
-        ticker = yf.Ticker(symbol)
-        company_name = ticker.info.get("longName", symbol)
-    except:
-        company_name = symbol
+    company_name = yf.Ticker(symbol).info.get("longName", symbol)
 
     embed = discord.Embed(
-        title=f"🔵 FVG検出アラート - {symbol}",
-        description=f"{company_name} でFair Value Gapが発生しました！",
+        title=f"📈 戦略1: FVG検出 - {symbol}",
+        description=f"**{company_name}** がエントリー条件を満たし、FVGを検出しました。",
         color=discord.Color.blue(),
         timestamp=datetime.now()
     )
-
     embed.add_field(
-        name="📊 FVG詳細",
-        value=f"• ギャップ上限: ${fvg['gap_top']:.2f}\n"
-              f"• ギャップ下限: ${fvg['gap_bottom']:.2f}\n"
-              f"• ギャップサイズ: {fvg['gap_size_percent']:.2f}%",
+        name="📊 FVG情報",
+        value=f"• 上限: `${fvg['gap_top']:.2f}`\n• 下限: `${fvg['gap_bottom']:.2f}`\n• サイズ: `{fvg['gap_size_percent']:.2f}%`",
         inline=False
     )
-
     embed.add_field(
-        name="💰 現在価格",
-        value=f"${result['current_price']:.2f}",
-        inline=True
-    )
-
-    ma_daily_pos = "付近" if result["conditions"]["near_daily_ma"] else "離脱"
-    embed.add_field(
-        name="📈 環境分析",
-        value=f"• 週足200SMA: ${result['weekly_sma200']:.2f} ✅\n"
-              f"• 日足200MA: ${result['daily_ma200']:.2f} ({ma_daily_pos})",
+        name="環境",
+        value=f"価格: `${result['current_price']:.2f}`\n週足SMA: `${result['weekly_sma200']:.2f}`\n日足MA: `${result['daily_ma200']:.2f}`",
         inline=False
     )
-    # Ensure resistance_levels is not empty before accessing its first element
-    first_target = "N/A"
-    if result["resistance_levels"]:
-        first_target = f"${result['resistance_levels'][0]:.2f}"
-
+    first_resistance = result["resistance_levels"][0] if result["resistance_levels"] else "N/A"
     embed.add_field(
-        name="💡 アクション",
-        value=f"• FVG下限(${fvg['gap_bottom']:.2f})付近での押し目買い検討\n"
-              f"• ストップロス: ${fvg['gap_bottom']*0.99:.2f} (FVG下抜け)\n"
-              f"• 第1目標: {first_target}",
+        name="次のステップ",
+        value=f"次のレジスタンス `{first_resistance:.2f}` の突破を監視します (戦略2)。",
         inline=False
     )
     return embed
 
 def create_resistance_alert_embed(result):
-    """レジスタンス突破アラート用のEmbed（第2アラート）"""
+    """戦略2（レジスタンス突破）のアラート用Embed"""
     symbol = result["symbol"]
     resistance = result["conditions"]["broken_resistance"]
     current_price = result["current_price"]
-
-    # 企業情報を取得
-    try:
-        ticker = yf.Ticker(symbol)
-        company_name = ticker.info.get("longName", symbol)
-    except:
-        company_name = symbol
-
+    company_name = yf.Ticker(symbol).info.get("longName", symbol)
     price_change = ((current_price - resistance) / resistance) * 100
 
     embed = discord.Embed(
-        title=f"🟢 レジスタンス突破アラート - {symbol}",
-        description=f"{company_name} がレジスタンス ${resistance:.2f} を突破しました！",
+        title=f"🚀 戦略2: レジスタンス突破 - {symbol}",
+        description=f"**{company_name}** が戦略1の条件達成後、レジスタンスを突破しました！",
         color=discord.Color.green(),
         timestamp=datetime.now()
     )
-
     embed.add_field(
-        name="💰 価格情報",
-        value=f"現在価格: ${current_price:.2f} (+{price_change:.1f}%)\n"
-              f"突破レジスタンス: ${resistance:.2f}",
+        name="💥 ブレイク情報",
+        value=f"• 現在価格: `${current_price:.2f}`\n• 突破ライン: `${resistance:.2f}` (+{price_change:.1f}%)",
         inline=False
     )
-
     volume_ratio = result["current_volume"] / result["avg_volume"]
-    fvg_text = "FVG発生済み ✅" if result["fvg_info"] else "FVGなし"
-
     embed.add_field(
-        name="📈 テクニカル確認",
-        value=f"• {fvg_text}\n"
-              f"• 出来高: 通常の{volume_ratio:.1f}倍\n"
-              f"• 直近高値更新 ✅",
+        name="テクニカル",
+        value=f"• FVG発生済み: ✅\n• 出来高: 通常の`{volume_ratio:.1f}`倍",
         inline=False
     )
-
-    stop_loss = resistance * 0.99
-    target1 = current_price * 1.05
-
+    target_price = current_price * (1 + TARGET_PROFIT_RATE)
+    stop_loss_price = result['fvg_info']['gap_bottom'] * (1 - STOP_LOSS_RATE)
     embed.add_field(
-        name="💡 エントリー戦略",
-        value=f"• 推奨エントリー: ${current_price:.2f}-${current_price*1.01:.2f}\n"
-              f"• ストップロス: ${stop_loss:.2f} (レジスタンス下)\n"
-              f"• 目標価格: ${target1:.2f} (+5.0%)",
+        name="トレード戦略（例）",
+        value=f"• 目標利益: `${target_price:.2f}`\n• ストップロス: `${stop_loss_price:.2f}`",
         inline=False
     )
     return embed
 
 async def scan_symbols():
     """全S&P500銘柄をスキャン（2段階アラート）"""
-    current_alerts = [] # Renamed to avoid conflict
-    # 進捗表示
+    current_alerts = []
     total_symbols = len(watched_symbols)
     processed = 0
 
     for symbol in watched_symbols:
         try:
             result = StockAnalyzer.check_fvg_break_conditions(symbol)
-            if not result or not result.get("signal_type"): # Added .get for safety
+            if not result or not result.get("signal_type"):
                 continue
 
-            # FVGアラート（第1段階）
-            if "fvg" in result.get("signal_type", ""): # Use .get with default for safety
-                if symbol not in fvg_alerts or \
-                   (isinstance(fvg_alerts[symbol], dict) and # Ensure it's a dict before accessing 'alert_time'
-                    datetime.now() - fvg_alerts[symbol].get('alert_time', datetime.min) > timedelta(hours=24)): # Use .get for alert_time
-                    result["alert_type"] = "fvg"
+            # 戦略1: FVG検出アラート
+            if result['signal_type'] == 's1_fvg':
+                # 24時間に1回のみアラート
+                if symbol not in fvg_alerts or (datetime.now() - fvg_alerts.get(symbol, {}).get('alert_time', datetime.min)) > timedelta(hours=24):
+                    result["alert_type"] = "s1_fvg"
                     current_alerts.append(result)
-                    fvg_alerts[symbol] = {
-                        "fvg_info": result["fvg_info"],
-                        "alert_time": datetime.now()
-                    }
-                    fvg_triggered_symbols[symbol] = result
+                    fvg_alerts[symbol] = {"alert_time": datetime.now()}
+                    fvg_triggered_symbols[symbol] = result # リスト更新
 
-            # レジスタンスアラート（第2段階）
-            if result.get("conditions", {}).get("resistance_break"): # Use .get for safety
-                if symbol not in resistance_alerts or \
-                   (isinstance(resistance_alerts.get(symbol), datetime) and # Check if resistance_alerts[symbol] is a datetime
-                    datetime.now() - resistance_alerts[symbol] > timedelta(hours=24)):
-                    result["alert_type"] = "resistance"
-                    current_alerts.append(result)
-                    resistance_alerts[symbol] = datetime.now()
-                    resistance_triggered_symbols[symbol] = result
+            # 戦略2: レジスタンス突破アラート
+            elif result['signal_type'] == 's2_resistance_break':
+                # S1アラートが出ていることが前提
+                if symbol in fvg_triggered_symbols:
+                    # 24時間に1回のみアラート
+                    if symbol not in resistance_alerts or (datetime.now() - resistance_alerts.get(symbol, datetime.min)) > timedelta(hours=24):
+                        result["alert_type"] = "s2_resistance_break"
+                        current_alerts.append(result)
+                        resistance_alerts[symbol] = datetime.now()
+                        resistance_triggered_symbols[symbol] = result # リスト更新
+                        # S2が出たらS1リストからは削除しても良い（重複を避けるため）
+                        # del fvg_triggered_symbols[symbol]
 
             processed += 1
             if processed % 50 == 0:
@@ -597,11 +556,13 @@ async def market_scan_task():
                 await config["alert_channel"].send(embed=summary_embed)
                 
                 # 個別アラートは最大20件まで
-                for alert_item in current_scan_alerts[:20]: # Renamed variable
-                    if alert_item.get("alert_type") == "fvg":
+                for alert_item in current_scan_alerts[:20]:
+                    if alert_item.get("alert_type") == "s1_fvg":
                         embed = create_fvg_alert_embed(alert_item)
-                    else:
+                    elif alert_item.get("alert_type") == "s2_resistance_break":
                         embed = create_resistance_alert_embed(alert_item)
+                    else:
+                        continue
 
                     try:
                         chart_buffer = StockAnalyzer.create_chart_with_fvg(alert_item["symbol"])
