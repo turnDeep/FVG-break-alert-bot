@@ -79,16 +79,23 @@ def main():
         print(f"最適パラメータ:")
         for key, value in best_params.items():
             print(f"  {key}: {value}")
-        
-        print(f"\nテストスコア: {test_results['test_score']:.2f}")
-        
-        print("\n📊 上位パフォーマンス銘柄:")
-        for i, result in enumerate(test_results['detailed_results'][:5], 1):
-            print(f"{i}. {result['symbol']}: "
-                  f"勝率 {result['win_rate']:.1f}%, "
-                  f"平均リターン {result['avg_return']:.2f}%, "
-                  f"トレード数 {result['total_trades']}")
-        
+
+        print("\n" + "-" * 60)
+        print("🧪 テスト期間での合算パフォーマンス")
+        print("-" * 60)
+        if test_results.get('error'):
+            print(f"エラー: {test_results['error']}")
+        else:
+            print(f"対象銘柄数: {test_results['symbols_tested']} (うちエラー: {test_results['symbols_with_errors']})")
+            print(f"総トレード数: {test_results['total_trades']} 回")
+            print(f"  - FVGトレード: {test_results['total_fvg_trades']} 回")
+            print(f"  - レジスタンス突破: {test_results['total_resistance_trades']} 回")
+            print(f"勝率: {test_results['win_rate']:.2f}%")
+            print(f"平均リターン: {test_results['avg_return_percent']:.2f}%")
+            print(f"プロフィットファクター: {test_results['profit_factor']:.2f}")
+            print(f"最大利益: {test_results['max_profit_percent']:.2f}%")
+            print(f"最大損失: {test_results['max_loss_percent']:.2f}%")
+
         print("\n結果ファイル:")
         print("  - optimized_params.json (最適化パラメータ)")
         print("  - optimization_results.png (最適化過程)")
