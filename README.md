@@ -26,7 +26,7 @@ S&P500銘柄のFair Value Gap（FVG）とレジスタンス突破を検出し、
 
 ```bash
 # リポジトリをクローン
-git clone https://github.com/yourusername/FVG-break-alert-bot.git
+git clone https://github.com/turnDeep/FVG-break-alert-bot.git
 cd FVG-break-alert-bot
 
 # 仮想環境を作成
