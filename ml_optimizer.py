@@ -37,36 +37,35 @@ class FVGParameterOptimizer:
             return ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK-B', 'JPM', 'JNJ']
 
     def calculate_score(self, result):
-        """戦略2のパフォーマンスを重視したスコア計算"""
+        """戦略2のパフォーマンスを最大化するためのスコア計算"""
         s1_stats = result['s1_stats']
         s2_stats = result['s2_stats']
 
-        # 戦略1（FVG）が一度も発生しない場合は大きなペナルティ
-        if s1_stats['count'] == 0:
-            return -1000
+        # 戦略2が一度も発生しない場合は、ほぼ無価値とする
+        if s2_stats['count'] == 0:
+            # ただし、戦略1の発生回数が多い場合は、惜しいパラメータとして少しだけ点を残す
+            return -1000 + s1_stats.get('count', 0) * 0.01
 
-        # ベーススコアは戦略1のパフォーマンス
-        base_score = s1_stats['avg_return'] * (s1_stats['win_rate'] / 100)
-        
-        # 戦略2のパフォーマンスによるボーナス
-        s2_bonus = 0
-        if s2_stats['count'] > 0:
-            # 戦略2の勝率と転換率を重視
-            s2_win_rate_bonus = (s2_stats['win_rate'] - 50) * 0.1 # 勝率50%を超えるとボーナス
-            s2_conversion_bonus = s2_stats['conversion_rate'] * 0.05 # 転換率が高いほどボーナス
-            s2_return_bonus = s2_stats['avg_return'] * 0.2 # 戦略2の平均リターンも加味
+        # スコアの基本は「戦略2の平均リターン × 戦略2の勝率」
+        # 勝率は0-100なので100で割る
+        score = s2_stats['avg_return'] * (s2_stats['win_rate'] / 100)
 
-            s2_bonus = (s2_win_rate_bonus + s2_conversion_bonus + s2_return_bonus) * (s2_stats['count'] / s1_stats['count'])
+        # ボーナスとペナルティ
+        # 1. 転換率ボーナス: 戦略1から2へ多く転換するほど良い
+        conversion_bonus = (s2_stats['conversion_rate'] / 100) * 5
+        score += conversion_bonus
 
-        score = base_score + s2_bonus
+        # 2. トレード数ボーナス: ある程度のトレード数があった方が信頼性が高い
+        trade_count_bonus = min(s2_stats['count'], 10) * 0.5 # 10回まで加点
+        score += trade_count_bonus
 
-        # トレード数が少なすぎる場合のペナルティ
-        if s1_stats['count'] < 5:
-            score -= (5 - s1_stats['count']) * 10
-
-        # 最大損失が大きい場合のペナルティ
-        if result['max_loss'] < -15: # 15%以上の損失
+        # 3. 極端な損失ペナルティ
+        if result['max_loss'] < -15:  # 15%以上の損失
             score -= abs(result['max_loss'])
+
+        # 4. 勝率が低い場合のペナルティ
+        if s2_stats['win_rate'] < 40:
+            score *= 0.5 # スコア半減
 
         return score
 
