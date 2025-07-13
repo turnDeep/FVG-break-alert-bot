@@ -12,7 +12,7 @@ def main():
     
     # 最適化パラメータ
     n_trials = int(os.getenv('OPTUNA_N_TRIALS', 100))
-    n_jobs = int(os.getenv('OPTUNA_N_JOBS', 4))
+    n_jobs = int(os.getenv('OPTUNA_N_JOBS', 6))
     max_symbols = int(os.getenv('MAX_SYMBOLS', 100))
     
     # 期間設定
