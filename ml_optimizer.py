@@ -191,47 +191,64 @@ class FVGParameterOptimizer:
         return self.best_params
 
     def validate_best_params(self, test_period_start='2024-01-01', test_period_end='2024-12-31'):
-        """最適パラメータを別期間でテスト"""
+        """最適パラメータを別期間でテストし、合算結果を返す"""
         if not self.best_params:
             raise ValueError("最適化を先に実行してください")
 
         print(f"\nテスト期間（{test_period_start} - {test_period_end}）で検証中...")
 
-        # テスト用銘柄（ランダムに50銘柄選択、ただし取得可能な銘柄数を超えないようにする）
-        available_symbols = self.get_sp500_symbols()
-        sample_size = min(50, len(available_symbols))
-        test_symbols = np.random.choice(available_symbols, sample_size, replace=False)
+        # テスト用銘柄（今回は全銘柄を対象とする）
+        test_symbols = self.get_sp500_symbols()
+        print(f"全{len(test_symbols)}銘柄でテストを実行します...")
 
-        # バックテスト実行
-        test_score = self.evaluate_parameters(
-            self.best_params,
-            test_symbols,
-            test_period_start,
-            test_period_end
-        )
-
-        print(f"テスト期間のスコア: {test_score:.2f}")
-
-        # 個別銘柄の詳細結果
         backtester = FVGBreakBacktest(**self.best_params)
-        detailed_results = []
+        all_trades = []
+        total_fvg_trades = 0
+        total_resistance_trades = 0
+        symbols_with_errors = 0
 
-        for symbol in test_symbols[:10]:  # 上位10銘柄の詳細
+        for symbol in test_symbols:
             try:
                 result = backtester.run_backtest(symbol, test_period_start, test_period_end)
                 if not result.get('error'):
-                    detailed_results.append({
-                        'symbol': symbol,
-                        'win_rate': result['combined_win_rate'],
-                        'avg_return': result['avg_return'],
-                        'total_trades': result['total_trades']
-                    })
-            except:
+                    all_trades.extend(result['fvg_trades'])
+                    all_trades.extend(result['resistance_trades'])
+                    total_fvg_trades += result['fvg_count']
+                    total_resistance_trades += result['resistance_breaks']
+            except Exception as e:
+                print(f"エラー: {symbol} のバックテスト中に問題が発生 - {e}")
+                symbols_with_errors += 1
                 continue
 
+        if not all_trades:
+            return {
+                'error': 'テスト期間中にトレードが一件もありませんでした。',
+                'symbols_tested': len(test_symbols),
+                'symbols_with_errors': symbols_with_errors
+            }
+
+        # 全トレード結果を集計
+        total_trades = len(all_trades)
+        returns = [t['return'] for t in all_trades]
+        wins = [r for r in returns if r > 0]
+
+        win_rate = len(wins) / total_trades * 100 if total_trades > 0 else 0
+        avg_return = np.mean(returns) * 100 if returns else 0
+        total_profit = sum(wins)
+        total_loss = sum(r for r in returns if r < 0)
+        profit_factor = abs(total_profit / total_loss) if total_loss != 0 else float('inf')
+
         return {
-            'test_score': test_score,
-            'detailed_results': detailed_results
+            'symbols_tested': len(test_symbols),
+            'symbols_with_errors': symbols_with_errors,
+            'total_trades': total_trades,
+            'total_fvg_trades': total_fvg_trades,
+            'total_resistance_trades': total_resistance_trades,
+            'win_rate': win_rate,
+            'avg_return_percent': avg_return,
+            'profit_factor': profit_factor,
+            'max_profit_percent': max(returns) * 100 if returns else 0,
+            'max_loss_percent': min(returns) * 100 if returns else 0,
         }
 
     def save_results(self, filename='optimized_params.json'):
