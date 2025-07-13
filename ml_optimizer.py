@@ -37,42 +37,36 @@ class FVGParameterOptimizer:
             return ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK-B', 'JPM', 'JNJ']
 
     def calculate_score(self, result):
-        """より柔軟なスコア計算"""
-        # トレードがない場合でも、条件を満たした回数で部分点を与える
-        if result['total_trades'] == 0:
-            # デバッグ情報から部分点を計算
-            debug_info = result.get('debug_info', {})
-            partial_score = (
-                debug_info.get('fvg_detected_count', 0) * 0.1 +
-                debug_info.get('resistance_breaks_detected', 0) * 0.2
-            )
-            return partial_score - 100  # 基本的にはペナルティだが、完全に-1000ではない
+        """戦略2のパフォーマンスを重視したスコア計算"""
+        s1_stats = result['s1_stats']
+        s2_stats = result['s2_stats']
 
-        # 基本メトリクス
-        avg_return = result['avg_return']
-        win_rate = result['combined_win_rate'] / 100
-        max_loss = abs(result['max_loss'])
-        total_trades = result['total_trades']
+        # 戦略1（FVG）が一度も発生しない場合は大きなペナルティ
+        if s1_stats['count'] == 0:
+            return -1000
+
+        # ベーススコアは戦略1のパフォーマンス
+        base_score = s1_stats['avg_return'] * (s1_stats['win_rate'] / 100)
         
-        # リスク調整後リターン（簡易シャープレシオ）
-        if max_loss > 0:
-            risk_adjusted_return = avg_return / max_loss
-        else:
-            risk_adjusted_return = avg_return
+        # 戦略2のパフォーマンスによるボーナス
+        s2_bonus = 0
+        if s2_stats['count'] > 0:
+            # 戦略2の勝率と転換率を重視
+            s2_win_rate_bonus = (s2_stats['win_rate'] - 50) * 0.1 # 勝率50%を超えるとボーナス
+            s2_conversion_bonus = s2_stats['conversion_rate'] * 0.05 # 転換率が高いほどボーナス
+            s2_return_bonus = s2_stats['avg_return'] * 0.2 # 戦略2の平均リターンも加味
 
-        # スコア計算（複数の要素を考慮）
-        score = (
-            risk_adjusted_return * 0.4 +  # リスク調整後リターン重視
-            win_rate * 100 * 0.3 +        # 勝率
-            min(total_trades / 10, 10) * 0.2 +  # 適度なトレード数
-            avg_return * 0.1              # 平均リターン
-        )
+            s2_bonus = (s2_win_rate_bonus + s2_conversion_bonus + s2_return_bonus) * (s2_stats['count'] / s1_stats['count'])
 
-        # ペナルティ
-        if win_rate < 0.4:  # 勝率40%未満はペナルティ
-            score *= 0.5
-        if max_loss > 10:   # 最大損失10%超はペナルティ
-            score *= 0.7
+        score = base_score + s2_bonus
+
+        # トレード数が少なすぎる場合のペナルティ
+        if s1_stats['count'] < 5:
+            score -= (5 - s1_stats['count']) * 10
+
+        # 最大損失が大きい場合のペナルティ
+        if result['max_loss'] < -15: # 15%以上の損失
+            score -= abs(result['max_loss'])
 
         return score
 
@@ -191,65 +185,60 @@ class FVGParameterOptimizer:
         return self.best_params
 
     def validate_best_params(self, test_period_start='2024-01-01', test_period_end='2024-12-31'):
-        """最適パラメータを別期間でテストし、合算結果を返す"""
+        """最適パラメータを別期間でテストし、戦略別の合算結果を返す"""
         if not self.best_params:
             raise ValueError("最適化を先に実行してください")
 
         print(f"\nテスト期間（{test_period_start} - {test_period_end}）で検証中...")
 
-        # テスト用銘柄（今回は全銘柄を対象とする）
         test_symbols = self.get_sp500_symbols()
         print(f"全{len(test_symbols)}銘柄でテストを実行します...")
 
         backtester = FVGBreakBacktest(**self.best_params)
-        all_trades = []
-        total_fvg_trades = 0
-        total_resistance_trades = 0
+        all_s1_trades = []
+        all_s2_trades = []
         symbols_with_errors = 0
 
         for symbol in test_symbols:
             try:
                 result = backtester.run_backtest(symbol, test_period_start, test_period_end)
                 if not result.get('error'):
-                    all_trades.extend(result['fvg_trades'])
-                    all_trades.extend(result['resistance_trades'])
-                    total_fvg_trades += result['fvg_count']
-                    total_resistance_trades += result['resistance_breaks']
+                    all_s1_trades.extend(result['strategy1_trades'])
+                    all_s2_trades.extend(result['strategy2_trades'])
             except Exception as e:
                 print(f"エラー: {symbol} のバックテスト中に問題が発生 - {e}")
                 symbols_with_errors += 1
                 continue
 
-        if not all_trades:
-            return {
-                'error': 'テスト期間中にトレードが一件もありませんでした。',
-                'symbols_tested': len(test_symbols),
-                'symbols_with_errors': symbols_with_errors
-            }
+        if not all_s1_trades:
+            return {'error': 'テスト期間中にトレードが一件もありませんでした。'}
 
-        # 全トレード結果を集計
-        total_trades = len(all_trades)
-        returns = [t['return'] for t in all_trades]
-        wins = [r for r in returns if r > 0]
+        # 戦略1の合算パフォーマンス
+        s1_returns = [t['return'] for t in all_s1_trades if 'return' in t]
+        s1_wins = [r for r in s1_returns if r > 0]
 
-        win_rate = len(wins) / total_trades * 100 if total_trades > 0 else 0
-        avg_return = np.mean(returns) * 100 if returns else 0
-        total_profit = sum(wins)
-        total_loss = sum(r for r in returns if r < 0)
-        profit_factor = abs(total_profit / total_loss) if total_loss != 0 else float('inf')
+        # 戦略2の合算パフォーマンス
+        s2_final_trades = [t for t in all_s1_trades if t.get('s2_triggered') and 'return' in t]
+        s2_returns = [t['return'] for t in s2_final_trades]
+        s2_wins = [r for r in s2_returns if r > 0]
 
-        return {
+        # 全体サマリー
+        summary = {
             'symbols_tested': len(test_symbols),
             'symbols_with_errors': symbols_with_errors,
-            'total_trades': total_trades,
-            'total_fvg_trades': total_fvg_trades,
-            'total_resistance_trades': total_resistance_trades,
-            'win_rate': win_rate,
-            'avg_return_percent': avg_return,
-            'profit_factor': profit_factor,
-            'max_profit_percent': max(returns) * 100 if returns else 0,
-            'max_loss_percent': min(returns) * 100 if returns else 0,
+            's1_stats': {
+                'count': len(all_s1_trades),
+                'win_rate': len(s1_wins) / len(all_s1_trades) * 100 if all_s1_trades else 0,
+                'avg_return': np.mean(s1_returns) * 100 if s1_returns else 0,
+            },
+            's2_stats': {
+                'count': len(all_s2_trades),
+                'conversion_rate': len(all_s2_trades) / len(all_s1_trades) * 100 if all_s1_trades else 0,
+                'win_rate': len(s2_wins) / len(s2_final_trades) * 100 if s2_final_trades else 0,
+                'avg_return': np.mean(s2_returns) * 100 if s2_returns else 0,
+            }
         }
+        return summary
 
     def save_results(self, filename='optimized_params.json'):
         """最適化結果を保存"""
