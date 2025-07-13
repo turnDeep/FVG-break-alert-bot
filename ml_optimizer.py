@@ -375,10 +375,15 @@ class FVGParameterOptimizer:
 
         # FVGゾーン
         fvg = trade_example['fvg_info']
-        fvg_start_loc = df.index.get_loc(fvg['date']) -2
-        rect = patches.Rectangle((fvg_start_loc, fvg['gap_bottom']), 2, fvg['gap_top'] - fvg['gap_bottom'],
-                                 linewidth=1, edgecolor='cyan', facecolor='cyan', alpha=0.3)
-        ax.add_patch(rect)
+        fvg_date = pd.to_datetime(fvg['date']).tz_localize(df.index.tz)
+
+        try:
+            fvg_start_loc = df.index.get_loc(fvg_date) - 2
+            rect = patches.Rectangle((fvg_start_loc, fvg['gap_bottom']), 2, fvg['gap_top'] - fvg['gap_bottom'],
+                                     linewidth=1, edgecolor='cyan', facecolor='cyan', alpha=0.3)
+            ax.add_patch(rect)
+        except KeyError:
+            print(f"FVG date {fvg_date} not found in index for chart.")
 
         # アノテーション
         def annotate_point(date, text, y_price, color):
