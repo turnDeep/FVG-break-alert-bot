@@ -324,14 +324,17 @@ class FVGParameterOptimizer:
         backtester = FVGBreakBacktest(**self.best_params)
         successful_s2_trades = []
 
-        for symbol in test_symbols:
+        for symbol in test_symbols[:20]:  # 最初の20銘柄のみチェック（効率化）
             try:
                 result = backtester.run_backtest(symbol, test_period_start, test_period_end)
                 if not result.get('error'):
                     for trade in result.get('strategy1_trades', []):
                         if trade.get('s2_triggered') and trade.get('return', 0) > 0:
+                            # シンボル情報も追加
+                            trade['symbol'] = symbol
                             successful_s2_trades.append(trade)
-            except Exception:
+            except Exception as e:
+                print(f"Warning: チャート用データ取得エラー ({symbol}): {e}")
                 continue
 
         if not successful_s2_trades:
@@ -343,68 +346,105 @@ class FVGParameterOptimizer:
         trade_example = random.choice(successful_s2_trades)
         symbol = trade_example['symbol']
 
-        # チャート用のデータを取得
-        stock = yf.Ticker(symbol)
-        df = stock.history(start=trade_example['entry_date'] - timedelta(days=60),
-                           end=trade_example['exit_date'] + timedelta(days=10))
-
-        if df.empty:
-            print(f"チャート作成エラー: {symbol}のデータ取得に失敗しました。")
-            return
-
-        # エントリー、トリガー、エグジットの日付
-        entry_date = trade_example['entry_date']
-        exit_date = trade_example['exit_date']
-        # s2_tradeを見つけてトリガー日を取得
-        s2_trigger_date = None
-        for s2_trade in backtester.run_backtest(symbol, test_period_start, test_period_end).get('strategy2_trades', []):
-             if s2_trade['entry_date'] == entry_date:
-                 s2_trigger_date = s2_trade['entry_date_s2']
-                 break
-
-        # スタイル設定
-        mc = mpf.make_marketcolors(up='green', down='red', edge='inherit', wick={'up':'green', 'down':'red'}, volume='in')
-        s = mpf.make_mpf_style(marketcolors=mc, gridstyle=':', y_on_right=True)
-
-        # プロット作成
-        fig, axes = mpf.plot(df, type='candle', style=s, volume=True,
-                             title=f"Example: {symbol} - Strategy 2 Success",
-                             returnfig=True, figsize=(15, 10))
-
-        ax = axes[0]
-
-        # FVGゾーン
-        fvg = trade_example['fvg_info']
-        fvg_date = pd.to_datetime(fvg['date']).tz_localize(df.index.tz)
-
         try:
-            fvg_start_loc = df.index.get_loc(fvg_date) - 2
-            rect = patches.Rectangle((fvg_start_loc, fvg['gap_bottom']), 2, fvg['gap_top'] - fvg['gap_bottom'],
-                                     linewidth=1, edgecolor='cyan', facecolor='cyan', alpha=0.3)
-            ax.add_patch(rect)
-        except KeyError:
-            print(f"FVG date {fvg_date} not found in index for chart.")
+            # チャート用のデータを取得
+            stock = yf.Ticker(symbol)
+            
+            # 日付範囲を検証
+            entry_date = pd.to_datetime(trade_example['entry_date'])
+            exit_date = pd.to_datetime(trade_example['exit_date'])
+            chart_start = entry_date - timedelta(days=60)
+            chart_end = exit_date + timedelta(days=10)
+            
+            # テスト期間内に収まるよう調整
+            period_start = pd.to_datetime(test_period_start)
+            period_end = pd.to_datetime(test_period_end)
+            chart_start = max(chart_start, period_start - timedelta(days=30))
+            chart_end = min(chart_end, period_end + timedelta(days=10))
+            
+            df = stock.history(start=chart_start, end=chart_end)
 
-        # アノテーション
-        def annotate_point(date, text, y_price, color):
-            if date in df.index:
-                x_loc = df.index.get_loc(date)
-                ax.annotate(text, (x_loc, y_price),
-                            xytext=(x_loc + 5, y_price * 1.05),
-                            arrowprops=dict(facecolor=color, shrink=0.05),
-                            fontsize=12, color='white',
-                            bbox=dict(boxstyle="round,pad=0.3", fc=color, ec='none', alpha=0.8))
+            if df.empty:
+                print(f"チャート作成エラー: {symbol}のデータ取得に失敗しました。")
+                return
 
-        annotate_point(entry_date, 'S1 Entry', trade_example['entry_price'], 'blue')
-        if s2_trigger_date:
-            s2_price = df.loc[s2_trigger_date]['Close']
-            annotate_point(s2_trigger_date, 'S2 Trigger', s2_price, 'orange')
-        annotate_point(exit_date, 'Exit', trade_example['exit_price'], 'purple')
+            # タイムゾーンを統一（全てtz-naiveに変換）
+            if df.index.tz is not None:
+                df.index = df.index.tz_localize(None)
+            
+            # 日付をtz-naiveに変換
+            def to_naive_date(date_obj):
+                if isinstance(date_obj, str):
+                    date_obj = pd.to_datetime(date_obj)
+                if hasattr(date_obj, 'tz') and date_obj.tz is not None:
+                    return date_obj.tz_localize(None)
+                return date_obj
 
-        # 保存
-        save_path = 'example_trade_chart.png'
-        fig.savefig(save_path)
-        print(f"✅ サンプルチャートを {save_path} に保存しました。")
+            entry_date = to_naive_date(entry_date)
+            exit_date = to_naive_date(exit_date)
+
+            # 戦略2トリガー日を探す
+            s2_trigger_date = None
+            try:
+                s2_result = backtester.run_backtest(symbol, test_period_start, test_period_end)
+                for s2_trade in s2_result.get('strategy2_trades', []):
+                    if pd.to_datetime(s2_trade['entry_date']) == entry_date:
+                        s2_trigger_date = to_naive_date(s2_trade.get('entry_date_s2'))
+                        break
+            except Exception as e:
+                print(f"Warning: S2トリガー日取得エラー: {e}")
+
+            # スタイル設定
+            mc = mpf.make_marketcolors(up='green', down='red', edge='inherit', wick={'up':'green', 'down':'red'}, volume='in')
+            s = mpf.make_mpf_style(marketcolors=mc, gridstyle=':', y_on_right=True)
+
+            # プロット作成
+            fig, axes = mpf.plot(df, type='candle', style=s, volume=True,
+                                 title=f"Example: {symbol} - Strategy 2 Success",
+                                 returnfig=True, figsize=(15, 10))
+
+            ax = axes[0]
+
+            # FVGゾーン
+            fvg = trade_example['fvg_info']
+            try:
+                fvg_date = to_naive_date(fvg['date'])
+                if fvg_date in df.index:
+                    fvg_start_loc = df.index.get_loc(fvg_date) - 2
+                    rect = patches.Rectangle((fvg_start_loc, fvg['gap_bottom']), 2, fvg['gap_top'] - fvg['gap_bottom'],
+                                             linewidth=1, edgecolor='cyan', facecolor='cyan', alpha=0.3)
+                    ax.add_patch(rect)
+            except Exception as e:
+                print(f"Warning: FVGゾーン描画エラー: {e}")
+
+            # アノテーション
+            def annotate_point(date, text, y_price, color):
+                try:
+                    if date in df.index:
+                        x_loc = df.index.get_loc(date)
+                        ax.annotate(text, (x_loc, y_price),
+                                    xytext=(x_loc + 5, y_price * 1.05),
+                                    arrowprops=dict(facecolor=color, shrink=0.05),
+                                    fontsize=12, color='white',
+                                    bbox=dict(boxstyle="round,pad=0.3", fc=color, ec='none', alpha=0.8))
+                except Exception as e:
+                    print(f"Warning: アノテーション描画エラー ({text}): {e}")
+
+            # アノテーション追加
+            annotate_point(entry_date, 'S1 Entry', trade_example['entry_price'], 'blue')
+            if s2_trigger_date and s2_trigger_date in df.index:
+                s2_price = df.loc[s2_trigger_date]['Close']
+                annotate_point(s2_trigger_date, 'S2 Trigger', s2_price, 'orange')
+            annotate_point(exit_date, 'Exit', trade_example['exit_price'], 'purple')
+
+            # 保存
+            save_path = 'example_trade_chart.png'
+            fig.savefig(save_path)
+            print(f"✅ サンプルチャートを {save_path} に保存しました。")
+            
+        except Exception as e:
+            print(f"チャート作成エラー: {e}")
+            print("チャート作成をスキップして続行します。")
 
 
 def main():
