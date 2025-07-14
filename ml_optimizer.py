@@ -35,7 +35,7 @@ class FVGParameterOptimizer:
         try:
             sp500 = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')[0]
             symbols = sp500['Symbol'].str.replace('.', '-').tolist()
-            return symbols[:100]  # デモ用に100銘柄に制限（全銘柄なら[:100]を削除）
+            return symbols  # デモ用に100銘柄に制限（全銘柄なら[:100]を削除）
         except:
             # フォールバック
             return ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK-B', 'JPM', 'JNJ']
