@@ -11,9 +11,9 @@ def main():
     """メイン実行関数"""
     
     # 最適化パラメータ
-    n_trials = int(os.getenv('OPTUNA_N_TRIALS', 100))
+    n_trials = int(os.getenv('OPTUNA_N_TRIALS', 50))
     n_jobs = int(os.getenv('OPTUNA_N_JOBS', 6))
-    max_symbols = int(os.getenv('MAX_SYMBOLS', 100))
+    max_symbols = int(os.getenv('MAX_SYMBOLS', 500))
     
     # 期間設定
     today = datetime.now()
