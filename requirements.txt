@@ -33,3 +33,4 @@ scikit-learn>=1.3.0
 # ml_optimizer用
 optuna>=3.3.0
 joblib>=1.3.0
+cmaes>=0.11.0
