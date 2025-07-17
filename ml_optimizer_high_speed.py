@@ -129,6 +129,25 @@ except ImportError:
                 'strategy2_trades': s2_trades
             }
 
+# グローバル関数として定義
+def _evaluate_single_symbol_wrapper(args):
+    """並列処理のための独立した評価関数"""
+    symbol, basic_params, start_date, end_date, optimizer_instance_for_scoring = args
+    try:
+        backtester = FVGBreakBacktest(**basic_params)
+        result = backtester.run_backtest(symbol, start_date, end_date)
+
+        if result.get('error'):
+            return None
+
+        # optimizerインスタンス経由でスコア計算メソッドを呼び出す
+        score = optimizer_instance_for_scoring.calculate_enhanced_score(result)
+        return score
+
+    except Exception:
+        return None
+
+
 class EnhancedFVGParameterOptimizer:
     """品質最優先の機械学習最適化システム"""
 
@@ -285,20 +304,15 @@ class EnhancedFVGParameterOptimizer:
     def evaluate_with_cross_validation(self, params, symbols, start_date, end_date):
         """TimeSeriesSplitを使用したクロスバリデーション"""
         try:
-            # 時系列データの準備
             start_dt = pd.to_datetime(start_date)
             end_dt = pd.to_datetime(end_date)
             
-            # Pandasの新しいバージョンに対応（'M'ではなく'ME'を使用）
             try:
-                # 3ヶ月単位で分割
                 months = pd.date_range(start=start_dt, end=end_dt, freq='3ME')
             except:
-                # 古いバージョンのPandasの場合
                 months = pd.date_range(start=start_dt, end=end_dt, freq='3M')
             
             if len(months) < 3:
-                # 期間が短すぎる場合は単純評価
                 return self.evaluate_parameters(params, symbols, start_date, end_date)
             
             cv_scores = []
@@ -309,39 +323,29 @@ class EnhancedFVGParameterOptimizer:
                 val_start = months[i+1].strftime('%Y-%m-%d')
                 val_end = months[i+2].strftime('%Y-%m-%d')
                 
-                # 各分割でのスコアを計算
                 train_score = self.evaluate_parameters(params, symbols, train_start, train_end)
                 val_score = self.evaluate_parameters(params, symbols, val_start, val_end)
                 
-                # 過学習チェック: 訓練と検証の差が大きすぎる場合はペナルティ
-                if train_score > -900 and val_score > -900:  # 有効なスコアの場合のみ
+                if train_score > -900 and val_score > -900:
                     overfitting_penalty = abs(train_score - val_score) * 0.1
                     adjusted_score = val_score - overfitting_penalty
                     cv_scores.append(adjusted_score)
-            
+
             if not cv_scores:
-                # クロスバリデーションが失敗した場合は単純評価にフォールバック
-                print("警告: クロスバリデーションが失敗。単純評価を使用します。")
-                return self.evaluate_parameters(params, symbols, start_date, end_date)
+                return -1000.0
             
             return np.mean(cv_scores)
             
-        except Exception as e:
-            print(f"クロスバリデーションエラー: {str(e)}")
-            # エラー時は単純評価にフォールバック
-            try:
-                return self.evaluate_parameters(params, symbols, start_date, end_date)
-            except:
-                return -1000
+        except Exception:
+            return -1000.0
 
     def evaluate_parameters_parallel(self, params, symbols, start_date, end_date):
         """パラメータセットを並列処理で複数銘柄評価"""
-        # キャッシュキーの生成
-        cache_key = f"{hash(frozenset(params.items()))}_{start_date}_{end_date}"
+        param_hash = hash(frozenset(params.items()))
+        cache_key = f"{param_hash}_{start_date}_{end_date}"
         if cache_key in self.cache:
             return self.cache[cache_key]
-        
-        # 基本パラメータのみを抽出
+
         basic_params = {
             'ma_period': params['ma_period'],
             'fvg_min_gap': params['fvg_min_gap'],
@@ -352,83 +356,64 @@ class EnhancedFVGParameterOptimizer:
             'ma_proximity_percent': params['ma_proximity_percent']
         }
         
-        # サンプル銘柄数を制限（高速モードではさらに削減）
         if self.fast_mode:
-            sample_symbols = symbols[:min(len(symbols), 5)]  # 高速モード：5銘柄
+            sample_symbols = symbols[:min(len(symbols), 5)]
         else:
-            sample_symbols = symbols[:min(len(symbols), 10)]  # 通常：10銘柄
+            sample_symbols = symbols[:min(len(symbols), 10)]
         
-        def evaluate_single_symbol(symbol):
+        tasks = [(symbol, basic_params, start_date, end_date, self) for symbol in sample_symbols]
+
+        scores = []
+        try:
+            with ProcessPoolExecutor(max_workers=self.n_jobs) as executor:
+                results = executor.map(_evaluate_single_symbol_wrapper, tasks)
+                scores = [score for score in results if score is not None]
+        except Exception:
+            return self.evaluate_parameters_sequential(params, symbols, start_date, end_date)
+
+        if not scores:
+            result = -1000.0
+        else:
+            result = np.median(scores)
+        
+        self.cache[cache_key] = result
+        return result
+
+    def evaluate_parameters_sequential(self, params, symbols, start_date, end_date):
+        """パラメータセットを逐次処理で評価（フォールバック用）"""
+        scores = []
+        basic_params = {
+            'ma_period': params['ma_period'],
+            'fvg_min_gap': params['fvg_min_gap'],
+            'resistance_lookback': params['resistance_lookback'],
+            'breakout_threshold': params['breakout_threshold'],
+            'stop_loss_rate': params['stop_loss_rate'],
+            'target_profit_rate': params['target_profit_rate'],
+            'ma_proximity_percent': params['ma_proximity_percent']
+        }
+        
+        sample_symbols = symbols[:min(len(symbols), 10)]
+        
+        for symbol in sample_symbols:
             try:
                 backtester = FVGBreakBacktest(**basic_params)
                 result = backtester.run_backtest(symbol, start_date, end_date)
                 if not result.get('error'):
-                    return self.calculate_enhanced_score(result)
-                return None
-            except Exception as e:
-                return None
-        
-        # 並列処理で評価
-        scores = []
-        with ProcessPoolExecutor(max_workers=self.n_jobs) as executor:
-            futures = {executor.submit(evaluate_single_symbol, symbol): symbol 
-                      for symbol in sample_symbols}
-            
-            for future in as_completed(futures):
-                score = future.result()
-                if score is not None:
-                    scores.append(score)
-        
-        if not scores:
-            result = -1000
-        else:
-            # 中央値を使用して外れ値の影響を軽減
-            result = np.median(scores)
-        
-        # 結果をキャッシュ
-        self.cache[cache_key] = result
-        return result
-
-    def evaluate_parameters(self, params, symbols, start_date, end_date):
-        """パラメータセットを複数銘柄で評価（並列処理版を使用）"""
-        if self.fast_mode or self.n_jobs > 1:
-            return self.evaluate_parameters_parallel(params, symbols, start_date, end_date)
-        
-        # 既存の逐次処理版（フォールバック）
-        scores = []
-        
-        basic_params = {
-            'ma_period': params['ma_period'],
-            'fvg_min_gap': params['fvg_min_gap'],
-            'resistance_lookback': params['resistance_lookback'],
-            'breakout_threshold': params['breakout_threshold'],
-            'stop_loss_rate': params['stop_loss_rate'],
-            'target_profit_rate': params['target_profit_rate'],
-            'ma_proximity_percent': params['ma_proximity_percent']
-        }
-        
-        try:
-            backtester = FVGBreakBacktest(**basic_params)
-        except Exception as e:
-            print(f"バックテスター初期化エラー: {e}")
-            return -1000
-        
-        sample_symbols = symbols[:min(len(symbols), 20)]
-        
-        for symbol in sample_symbols:
-            try:
-                result = backtester.run_backtest(symbol, start_date, end_date)
-                if not result.get('error'):
                     score = self.calculate_enhanced_score(result)
                     scores.append(score)
-            except Exception as e:
-                print(f"評価エラー ({symbol}): {e}")
+            except Exception:
                 continue
         
         if not scores:
-            return -1000
-        
+            return -1000.0
         return np.median(scores)
+
+    def evaluate_parameters(self, params, symbols, start_date, end_date):
+        """パラメータセットを複数銘柄で評価（並列/逐次を自動選択）"""
+        if self.fast_mode or self.n_jobs > 1:
+            return self.evaluate_parameters_parallel(params, symbols, start_date, end_date)
+        else:
+            return self.evaluate_parameters_sequential(params, symbols, start_date, end_date)
 
     def multi_stage_optimization(self, symbols, start_date, end_date):
         """多段階最適化戦略の実行"""
