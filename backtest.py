@@ -92,26 +92,38 @@ class FVGBreakBacktest:
 
         return unique_highs[:3]
 
-    def run_backtest(self, symbol: str, start_date: str, end_date: str, cache_dir: str = "sp500_data") -> Dict:
+    def run_backtest(self, symbol: str, start_date: str, end_date: str) -> Dict:
         """バックテストを実行"""
-        cache_path = os.path.join(cache_dir, f"{symbol}.csv")
-        if not os.path.exists(cache_path):
-            return {"error": f"キャッシュデータなし: {symbol}"}
-
-        try:
-            df_daily_full = pd.read_csv(cache_path, index_col='Date', parse_dates=True)
-        except Exception as e:
-            return {"error": f"キャッシュ読み込みエラー: {e}"}
-
         start_date_dt = pd.to_datetime(start_date)
         end_date_dt = pd.to_datetime(end_date)
 
         # MA計算のために十分なデータを確保
-        ma_start_date = start_date_dt - timedelta(days=self.ma_period * 2)
-        df_full_period = df_daily_full[ma_start_date:]
+        fetch_start_date = start_date_dt - timedelta(days=self.ma_period * 2)
 
-        if df_full_period.empty:
-            return {"error": "指定期間のデータが不足しています"}
+        retries = 3
+        df_daily_full = pd.DataFrame() # 空のデータフレームで初期化
+        for i in range(retries):
+            try:
+                df_daily_full = yf.download(
+                    symbol,
+                    start=fetch_start_date,
+                    end=end_date_dt,
+                    auto_adjust=False,
+                    progress=False
+                )
+                if not df_daily_full.empty:
+                    break
+            except Exception as e:
+                if i == retries - 1:
+                    return {"error": f"yfinanceダウンロードエラー ({symbol}): {e}"}
+                time.sleep(i + 1)
+
+        # 必要なカラムが存在するかを厳密にチェック
+        required_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+        if df_daily_full.empty or not all(col in df_daily_full.columns for col in required_columns):
+            return {"error": f"データ取得エラーまたはカラム不足: {symbol}"}
+
+        df_full_period = df_daily_full.copy()
 
         # 週次データを作成
         df_weekly_full = df_full_period.resample('W-MON').agg({
