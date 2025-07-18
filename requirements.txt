@@ -4,6 +4,7 @@ discord.py>=2.3.0
 # 株価データ取得
 yfinance>=0.2.28
 lxml>=4.9.0
+curl_cffi>=0.6.1
 
 # データ分析
 pandas>=2.0.0
