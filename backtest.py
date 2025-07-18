@@ -360,11 +360,15 @@ if __name__ == "__main__":
     # バックテスト実行
     backtester = FVGBreakBacktest()
 
-    # NVIDIAの1年間バックテスト
+    # 動的な日付設定
+    end_date_dt = datetime.now()
+    start_date_dt = end_date_dt - timedelta(days=10*365) # 10年前
+
+    # NVIDIAのバックテスト
     result = backtester.run_backtest(
         symbol="NVDA",
-        start_date="2023-01-01",
-        end_date="2024-01-01"
+        start_date=start_date_dt.strftime('%Y-%m-%d'),
+        end_date=end_date_dt.strftime('%Y-%m-%d')
     )
 
     # レポート出力
