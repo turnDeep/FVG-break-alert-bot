@@ -15,6 +15,7 @@ import warnings
 import pytz
 import sys # sysモジュールをインポート
 import json
+from curl_cffi import requests
 warnings.filterwarnings("ignore")
 from backtest import FVGBreakBacktest
 
@@ -89,10 +90,14 @@ class StockAnalyzer:
     @staticmethod
     def get_stock_data(symbol, period="1y", interval="1d"):
         """株価データを取得"""
+        session = requests.Session(impersonate="safari15_5")
         try:
-            stock = yf.Ticker(symbol)
+            stock = yf.Ticker(symbol, session=session)
             df = stock.history(period=period, interval=interval)
-            return df if not df.empty else None
+            if df.empty:
+                return None
+            df.index = df.index.tz_localize(None)
+            return df
         except Exception as e:
             print(f"データ取得エラー ({symbol}): {e}")
             return None
