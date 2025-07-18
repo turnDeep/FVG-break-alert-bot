@@ -194,11 +194,22 @@ class StockAnalyzer:
 
     @staticmethod
     def create_chart_with_fvg(symbol, save_path=None):
-        df = StockAnalyzer.get_stock_data(symbol, period="6mo")
-        if df is None: return None
+        # 日足データを長めに取得してMAを計算
+        df_daily_long = StockAnalyzer.get_stock_data(symbol, period="2y", interval="1d")
+        if df_daily_long is None: return None
+        df_daily_long['MA200'] = df_daily_long['Close'].rolling(window=MA_PERIOD).mean()
 
-        df['MA200'] = df['Close'].rolling(window=MA_PERIOD).mean()
-        df_plot = df.tail(60).copy()
+        # 週足データを取得してSMAを計算
+        df_weekly = StockAnalyzer.get_stock_data(symbol, period="5y", interval="1wk")
+        if df_weekly is None: return None
+        df_weekly['SMA200'] = df_weekly['Close'].rolling(window=MA_PERIOD).mean()
+
+        # プロット用の日足データ（直近6ヶ月分）
+        df_plot = StockAnalyzer.get_stock_data(symbol, period="6mo").copy()
+        if df_plot.empty: return None
+
+        # 計算済みの日足MAと週足SMAをプロット用データに結合
+        df_plot = df_plot.join(df_daily_long['MA200']).join(df_weekly['SMA200'].asfreq('D', method='ffill'), rsuffix='_weekly')
 
         fvg_zones = []
         for i in range(len(df_plot) - 2):
@@ -209,15 +220,24 @@ class StockAnalyzer:
         s = mpf.make_mpf_style(marketcolors=mc, gridstyle=':', y_on_right=True)
 
         apds = []
+        # 日足MA200
         if 'MA200' in df_plot.columns and not df_plot['MA200'].isna().all():
-            apds.append(mpf.make_addplot(df_plot['MA200'], color='blue', width=2))
+            apds.append(mpf.make_addplot(df_plot['MA200'], color='blue', width=1.5, panel=0))
+        # 週足SMA200
+        if 'SMA200' in df_plot.columns and not df_plot['SMA200'].isna().all():
+            apds.append(mpf.make_addplot(df_plot['SMA200'], color='orange', width=1.5, linestyle=':', panel=0))
 
-        resistance_levels = StockAnalyzer.find_resistance_levels(df, RESISTANCE_LOOKBACK)
+        resistance_levels = StockAnalyzer.find_resistance_levels(df_daily_long, RESISTANCE_LOOKBACK)
         for r in resistance_levels:
             apds.append(mpf.make_addplot([r] * len(df_plot), color='red', width=1, linestyle='--'))
 
         fig, axes = mpf.plot(df_plot, type='candle', style=s, volume=True, addplot=apds,
-                             title=f'{symbol} - FVG & Resistance Analysis', returnfig=True, figsize=(12, 8))
+                             title=f'{symbol} - FVG & Resistance Analysis', returnfig=True, figsize=(12, 8),
+                             panel_ratios=(3, 1))
+
+        # 凡例を追加
+        axes[0].legend(['Daily MA200', 'Weekly SMA200'], loc='upper left')
+
         ax = axes[0]
         for fvg in fvg_zones[-3:]:
             if fvg['detected_date'] in df_plot.index:
