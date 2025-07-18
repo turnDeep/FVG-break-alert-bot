@@ -42,6 +42,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import yfinance as yf
+from curl_cffi import requests
 import optuna
 from optuna.samplers import TPESampler, RandomSampler, CmaEsSampler, NSGAIISampler
 from sklearn.model_selection import TimeSeriesSplit
@@ -189,6 +190,7 @@ class EnhancedFVGParameterOptimizer:
     def get_sp500_symbols(self, cache_dir="sp500_data"):
         """S&P500銘柄リストを取得し、データをキャッシュする"""
         os.makedirs(cache_dir, exist_ok=True)
+        session = requests.Session(impersonate="safari15_5")
 
         try:
             sp500 = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')[0]
@@ -213,7 +215,8 @@ class EnhancedFVGParameterOptimizer:
                 cache_path = os.path.join(cache_dir, f"{symbol}.csv")
                 if not os.path.exists(cache_path):
                     try:
-                        data = yf.download(symbol, start='2021-01-01', end='2025-01-01', progress=False, auto_adjust=False)
+                        ticker_obj = yf.Ticker(symbol, session=session)
+                        data = ticker_obj.history(start='2021-01-01', end='2025-01-01', auto_adjust=False)
                         if not data.empty:
                             data.to_csv(cache_path)
                     except Exception as e:
