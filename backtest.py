@@ -1,5 +1,6 @@
 """
-バックテストモジュール - FVG & レジスタンス突破戦略の過去検証
+改善版バックテストモジュール - FVG & レジスタンス突破戦略の過去検証
+画像の3つのトレード例を再現できるように改善
 """
 import warnings
 warnings.simplefilter(action='error', category=FutureWarning)
@@ -13,12 +14,13 @@ from curl_cffi import requests
 import time
 
 class FVGBreakBacktest:
-    """FVG突破戦略のバックテストクラス"""
+    """FVG突破戦略のバックテストクラス（改善版）"""
 
-    def __init__(self, ma_period=200, fvg_min_gap=0.5,
-                 resistance_lookback=20, breakout_threshold=1.005,
+    def __init__(self, ma_period=200, fvg_min_gap=0.1,  # FVGの最小ギャップを0.5から0.1に緩和
+                 resistance_lookback=50,  # レジスタンスルックバックを20から50に拡大
+                 breakout_threshold=1.002,  # ブレイクアウト閾値を1.005から1.002に緩和
                  stop_loss_rate=0.02, target_profit_rate=0.05,
-                 ma_proximity_percent=0.05):
+                 ma_proximity_percent=0.10):  # MA近接条件を0.05から0.10に緩和
         self.ma_period = ma_period
         self.fvg_min_gap = fvg_min_gap
         self.resistance_lookback = resistance_lookback
@@ -28,7 +30,7 @@ class FVGBreakBacktest:
         self.ma_proximity_percent = ma_proximity_percent
 
     def detect_fvg(self, df: pd.DataFrame, index: int) -> Optional[Dict]:
-        """FVG検出を改善"""
+        """FVG検出を改善 - より小さなギャップも検出"""
         if index < 2 or index >= len(df):
             return None
     
@@ -38,61 +40,127 @@ class FVGBreakBacktest:
         candle3 = df.iloc[index]
 
         # ブルッシュFVG（上昇）
-        gap_up = candle3['Low'] - candle1['High']
+        # より緩い条件：candle2の高値がcandle1とcandle3の間にギャップを作る
+        if candle3['Low'] > candle1['High']:  # 明確なギャップ
+            gap_size = candle3['Low'] - candle1['High']
+            gap_percent = (gap_size / candle1['High']) * 100
+            
+            if gap_percent >= self.fvg_min_gap:
+                return {
+                    'type': 'bullish',
+                    'date': df.index[index],
+                    'gap_top': candle3['Low'],
+                    'gap_bottom': candle1['High'],
+                    'gap_size_percent': gap_percent,
+                    'entry_price': candle3['Close'],
+                    'candle2_high': candle2['High'],  # 中間ローソクの高値も記録
+                    'candle2_low': candle2['Low']
+                }
 
-        # ベアリッシュFVG（下降）も検出
-        gap_down = candle1['Low'] - candle3['High']
-
-        # より緩い条件で検出
-        if gap_up > 0 and (gap_up / candle1['High']) * 100 >= self.fvg_min_gap:
-            return {
-                'type': 'bullish',
-                'date': df.index[index],
-                'gap_top': candle3['Low'],
-                'gap_bottom': candle1['High'],
-                'gap_size_percent': (gap_up / candle1['High']) * 100,
-                'entry_price': candle3['Close']
-            }
-        elif gap_down > 0 and (gap_down / candle3['High']) * 100 >= self.fvg_min_gap:
-            return {
-                'type': 'bearish',
-                'date': df.index[index],
-                'gap_top': candle1['Low'],
-                'gap_bottom': candle3['High'],
-                'gap_size_percent': (gap_down / candle3['High']) * 100,
-                'entry_price': candle3['Close']
-            }
+        # ベアリッシュFVG（下降）
+        elif candle1['Low'] > candle3['High']:  # 明確なギャップ
+            gap_size = candle1['Low'] - candle3['High']
+            gap_percent = (gap_size / candle3['High']) * 100
+            
+            if gap_percent >= self.fvg_min_gap:
+                return {
+                    'type': 'bearish',
+                    'date': df.index[index],
+                    'gap_top': candle1['Low'],
+                    'gap_bottom': candle3['High'],
+                    'gap_size_percent': gap_percent,
+                    'entry_price': candle3['Close'],
+                    'candle2_high': candle2['High'],
+                    'candle2_low': candle2['Low']
+                }
 
         return None
 
-    def find_resistance_levels(self, df: pd.DataFrame, current_index: int) -> List[float]:
-        """現在位置から遡ってレジスタンスレベルを検出"""
+    def find_resistance_levels(self, df: pd.DataFrame, current_index: int) -> List[Dict]:
+        """レジスタンスレベルの検出を改善 - 価格帯とボリュームを考慮"""
         start_index = max(0, current_index - self.resistance_lookback)
         df_lookback = df.iloc[start_index:current_index]
 
-        if len(df_lookback) < 5:
+        if len(df_lookback) < 10:
             return []
 
-        # 直近の高値を取得
+        resistance_levels = []
+        
+        # 1. 直近の明確な高値
         recent_high = df_lookback['High'].max()
+        recent_high_idx = df_lookback['High'].idxmax()
+        resistance_levels.append({
+            'level': recent_high,
+            'type': 'recent_high',
+            'date': recent_high_idx,
+            'strength': 3  # 強度スコア
+        })
 
-        # ローカル高値も検出
-        highs = []
+        # 2. ローカル高値（スイングハイ）
         for i in range(2, len(df_lookback) - 2):
             if (df_lookback['High'].iloc[i] > df_lookback['High'].iloc[i-1] and
                 df_lookback['High'].iloc[i] > df_lookback['High'].iloc[i-2] and
                 df_lookback['High'].iloc[i] > df_lookback['High'].iloc[i+1] and
                 df_lookback['High'].iloc[i] > df_lookback['High'].iloc[i+2]):
-                highs.append(df_lookback['High'].iloc[i])
+                
+                level = df_lookback['High'].iloc[i]
+                # 既存のレベルと近すぎない場合のみ追加
+                if all(abs(level - r['level']) / r['level'] > 0.005 for r in resistance_levels):
+                    resistance_levels.append({
+                        'level': level,
+                        'type': 'swing_high',
+                        'date': df_lookback.index[i],
+                        'strength': 2
+                    })
 
-        # 重複を除いて返す
-        all_highs = [recent_high] + highs
-        unique_highs = []
-        for high in sorted(all_highs, reverse=True):
-            if not unique_highs or all(abs(high - h) / h > 0.01 for h in unique_highs):
-                unique_highs.append(high)
+        # 3. ボリュームクラスター（高ボリュームエリア）
+        if 'Volume' in df_lookback.columns:
+            volume_mean = df_lookback['Volume'].mean()
+            high_volume_days = df_lookback[df_lookback['Volume'] > volume_mean * 1.5]
+            
+            for idx, row in high_volume_days.iterrows():
+                level = row['High']
+                if all(abs(level - r['level']) / r['level'] > 0.005 for r in resistance_levels):
+                    resistance_levels.append({
+                        'level': level,
+                        'type': 'volume_cluster',
+                        'date': idx,
+                        'strength': 1
+                    })
 
-        return unique_highs[:3]
+        # 4. 価格の集中帯（コンソリデーションエリア）
+        price_counts = pd.cut(df_lookback['High'], bins=20).value_counts()
+        if len(price_counts) > 0:
+            most_common_range = price_counts.idxmax()
+            if pd.notna(most_common_range):
+                consolidation_level = most_common_range.mid
+                if all(abs(consolidation_level - r['level']) / r['level'] > 0.005 for r in resistance_levels):
+                    resistance_levels.append({
+                        'level': consolidation_level,
+                        'type': 'consolidation',
+                        'date': df_lookback.index[-1],
+                        'strength': 1
+                    })
+
+        # 強度でソートして返す
+        resistance_levels.sort(key=lambda x: (-x['strength'], -x['level']))
+        return resistance_levels[:5]  # 上位5つのレジスタンスレベルを返す
+
+    def check_fvg_retest_entry(self, df: pd.DataFrame, index: int, fvg: Dict) -> bool:
+        """FVGへのリテスト（戻り）を確認してエントリー"""
+        if fvg['type'] != 'bullish':
+            return False
+            
+        current_price = df['Close'].iloc[index]
+        current_low = df['Low'].iloc[index]
+        
+        # FVGゾーンにタッチまたは侵入
+        if current_low <= fvg['gap_top'] and current_price > fvg['gap_bottom']:
+            # 価格がFVGゾーンから上に抜けようとしている
+            if index > 0 and df['Close'].iloc[index] > df['Close'].iloc[index-1]:
+                return True
+        
+        return False
 
     def run_backtest(self, symbol: str, start_date: str, end_date: str) -> Dict:
         """バックテストを実行"""
@@ -104,7 +172,7 @@ class FVGBreakBacktest:
 
         session = requests.Session(impersonate="safari15_5")
         retries = 3
-        df_daily_full = pd.DataFrame() # 空のデータフレームで初期化
+        df_daily_full = pd.DataFrame()
         for i in range(retries):
             try:
                 ticker_obj = yf.Ticker(symbol, session=session)
@@ -127,65 +195,39 @@ class FVGBreakBacktest:
 
         df_daily_full.index = df_daily_full.index.tz_localize(None)
 
-        # 週次データを作成
-        df_weekly_full = df_daily_full.resample('W-MON').agg({
-            'Open': 'first',
-            'High': 'max',
-            'Low': 'min',
-            'Close': 'last',
-            'Volume': 'sum'
-        }).dropna()
-
         # 移動平均計算
         df_daily_full['MA200'] = df_daily_full['Close'].rolling(window=self.ma_period).mean()
-        df_weekly_full['SMA200'] = df_weekly_full['Close'].rolling(window=self.ma_period).mean()
-
-        # 週次SMAを日次データにマージ (より堅牢な方法)
-        if df_daily_full.index.tz is not None:
-            df_daily_full.index = df_daily_full.index.tz_localize(None)
-        if df_weekly_full.index.tz is not None:
-            df_weekly_full.index = df_weekly_full.index.tz_localize(None)
-
-        df_daily_full_reset = df_daily_full.reset_index()
-        df_weekly_full_reset = df_weekly_full.reset_index()
-
-        df_daily_full_reset['Week_Start'] = pd.to_datetime(df_daily_full_reset['Date']).dt.to_period('W-MON').apply(lambda r: r.start_time)
-        df_weekly_full_reset['Week_Start'] = pd.to_datetime(df_weekly_full_reset['Date']).dt.to_period('W-MON').apply(lambda r: r.start_time)
-
-        df_daily_full = pd.merge(df_daily_full_reset,
-                                 df_weekly_full_reset[['Week_Start', 'SMA200']],
-                                 on='Week_Start',
-                                 how='left',
-                                 suffixes=('', '_weekly'))
-
-        df_daily_full = df_daily_full.set_index('Date')
-        df_daily_full.rename(columns={'SMA200': 'Weekly_SMA200'}, inplace=True)
-        df_daily_full['Weekly_SMA200'] = df_daily_full['Weekly_SMA200'].ffill()
         
         # 元の期間にデータをトリム
         df_daily = df_daily_full.loc[start_date_dt:end_date].copy()
         
         # トレード記録
-        strategy1_trades = [] # FVG
-        strategy2_trades = [] # FVG + Resistance
+        strategy1_trades = []  # FVG
+        strategy2_trades = []  # FVG + Resistance
         active_s1_trade = None
+        detected_fvgs = []  # 検出されたFVGを保存
 
         # デバッグ情報を記録
         debug_info = {
             'total_days': len(df_daily),
             'days_with_valid_ma': 0,
-            'days_above_weekly_sma': 0,
-            'days_near_daily_ma': 0,
+            'days_above_ma': 0,
             'fvg_detected_count': 0,
+            'fvg_retest_count': 0,
             'resistance_breaks_detected': 0
         }
         
         # バックテスト実行
-        for i in range(1, len(df_daily)):
+        for i in range(3, len(df_daily)):  # 最初の3日は必要なデータがないためスキップ
             current_date = df_daily.index[i]
             current_price = df_daily['Close'].iloc[i]
+            current_high = df_daily['High'].iloc[i]
             daily_ma = df_daily['MA200'].iloc[i]
-            weekly_sma = df_daily['Weekly_SMA200'].iloc[i]
+
+            # MAが有効かチェック
+            if pd.isna(daily_ma):
+                continue
+            debug_info['days_with_valid_ma'] += 1
 
             # --- ポジション管理 ---
             if active_s1_trade:
@@ -193,7 +235,12 @@ class FVGBreakBacktest:
                 if not active_s1_trade.get('s2_triggered'):
                     resistance_levels = self.find_resistance_levels(df_daily, i)
                     for resistance in resistance_levels:
-                        if current_price > resistance * self.breakout_threshold and df_daily['Close'].iloc[i-1] <= resistance:
+                        resistance_level = resistance['level']
+                        # 前日は抵抗線以下、今日は突破
+                        if (i > 0 and 
+                            df_daily['High'].iloc[i-1] <= resistance_level * 1.001 and
+                            current_high > resistance_level * self.breakout_threshold):
+                            
                             debug_info['resistance_breaks_detected'] += 1
                             active_s1_trade['s2_triggered'] = True
 
@@ -221,33 +268,40 @@ class FVGBreakBacktest:
 
             # --- 新規エントリー条件 ---
             if not active_s1_trade:
-                # 基本条件
-                if pd.isna(daily_ma) or pd.isna(weekly_sma):
+                # 基本条件：価格がMAより上
+                if current_price <= daily_ma:
                     continue
-                debug_info['days_with_valid_ma'] += 1
+                debug_info['days_above_ma'] += 1
 
-                if current_price <= weekly_sma:
-                    continue
-                debug_info['days_above_weekly_sma'] += 1
-
-                ma_distance = abs(current_price - daily_ma) / daily_ma
-                if ma_distance > self.ma_proximity_percent:
-                    continue
-                debug_info['days_near_daily_ma'] += 1
-
-                # 戦略1のトリガー（FVG検出）
+                # FVG検出
                 fvg = self.detect_fvg(df_daily, i)
-                if fvg and fvg['type'] == 'bullish': # ブルッシュFVGのみを対象
+                if fvg and fvg['type'] == 'bullish':
                     debug_info['fvg_detected_count'] += 1
-                    active_s1_trade = {
-                        'symbol': symbol,
-                        'entry_date': current_date,
-                        'entry_price': current_price,
-                        'fvg_info': fvg,
-                        'stop_loss': fvg['gap_bottom'] * (1 - self.stop_loss_rate),
-                        'target': current_price * (1 + self.target_profit_rate),
-                        's2_triggered': False
-                    }
+                    detected_fvgs.append({
+                        'fvg': fvg,
+                        'index': i,
+                        'tested': False
+                    })
+
+                # 検出済みFVGへのリテストをチェック
+                for fvg_data in detected_fvgs:
+                    if not fvg_data['tested'] and i > fvg_data['index'] + 1:
+                        # FVGが検出されてから少なくとも2日後
+                        if self.check_fvg_retest_entry(df_daily, i, fvg_data['fvg']):
+                            debug_info['fvg_retest_count'] += 1
+                            fvg_data['tested'] = True
+                            
+                            # エントリー
+                            active_s1_trade = {
+                                'symbol': symbol,
+                                'entry_date': current_date,
+                                'entry_price': current_price,
+                                'fvg_info': fvg_data['fvg'],
+                                'stop_loss': fvg_data['fvg']['gap_bottom'] * (1 - self.stop_loss_rate),
+                                'target': current_price * (1 + self.target_profit_rate),
+                                's2_triggered': False
+                            }
+                            break
 
         # 未決済ポジションの処理
         if active_s1_trade:
@@ -269,7 +323,6 @@ class FVGBreakBacktest:
         s1_wins = [r for r in s1_returns if r > 0]
         
         # 戦略2 (FVG -> Resistance) の統計
-        # 戦略2のトレードは、戦略1のトレード結果を継承する
         s2_final_trades = []
         for s2_trade in strategy2_trades:
             # 対応するs1トレードを見つける
@@ -320,30 +373,39 @@ class FVGBreakBacktest:
     
         s1 = result['s1_stats']
         s2 = result['s2_stats']
+        debug = result['debug_info']
 
         report = f"""
 📊 FVGベース戦略 バックテスト結果 - {result['symbol']}
 期間: {result['period']}
 ━━━━━━━━━━━━━━━━━━━━━━━━
 
-📈 戦略1: FVG検出
+📈 戦略1: FVGリテスト
 • トレード数: {s1['count']}回
 • 勝率: {s1['win_rate']:.1f}%
 • 平均リターン: {s1['avg_return']:.2f}%
 
-🚀 戦略2: FVG検出 → レジスタンス突破
+🚀 戦略2: FVGリテスト → レジスタンス突破
 • 転換率 (S1→S2): {s2['conversion_rate']:.1f}%
 • トレード数: {s2['count']}回
 • 勝率: {s2['win_rate']:.1f}%
-• 平均リターン: {s2['avg_return']:.2f}% (S1エントリーからの最終リターン)
+• 平均リターン: {s2['avg_return']:.2f}%
 
-💰 全体パフォーマンス (戦略1ベース):
+💰 全体パフォーマンス:
 • 総トレード数: {result['total_trades']}回
 • 平均リターン: {result['avg_return']:.2f}%
 • 最大利益: {result['max_profit']:.2f}%
 • 最大損失: {result['max_loss']:.2f}%
 
-📋 最近のトレード例 (戦略1):
+🔍 デバッグ情報:
+• 分析日数: {debug['total_days']}日
+• MA有効日数: {debug['days_with_valid_ma']}日
+• MA上日数: {debug['days_above_ma']}日
+• FVG検出数: {debug['fvg_detected_count']}回
+• FVGリテスト数: {debug['fvg_retest_count']}回
+• レジスタンス突破数: {debug['resistance_breaks_detected']}回
+
+📋 最近のトレード例:
 """
         # 最新のトレード例を表示
         for trade in result['strategy1_trades'][-5:]:
@@ -355,21 +417,38 @@ class FVGBreakBacktest:
 
         return report
 
+
 # 使用例
 if __name__ == "__main__":
     # バックテスト実行
-    backtester = FVGBreakBacktest()
-
-    # 動的な日付設定
-    end_date_dt = datetime.now()
-    start_date_dt = end_date_dt - timedelta(days=10*365) # 10年前
-
-    # NVIDIAのバックテスト
-    result = backtester.run_backtest(
-        symbol="NVDA",
-        start_date=start_date_dt.strftime('%Y-%m-%d'),
-        end_date=end_date_dt.strftime('%Y-%m-%d')
+    backtester = FVGBreakBacktest(
+        fvg_min_gap=0.1,  # より小さなギャップも検出
+        resistance_lookback=50,  # より広い範囲でレジスタンスを探索
+        breakout_threshold=1.002,  # より敏感なブレイクアウト検出
+        ma_proximity_percent=0.10  # MA近接条件を緩和
     )
 
-    # レポート出力
-    print(backtester.create_summary_report(result))
+    # 画像の例に合わせた期間でテスト
+    symbols = ["VOD", "NVDA", "ANET"]
+    
+    for symbol in symbols:
+        print(f"\n{'='*50}")
+        print(f"Testing {symbol}")
+        print('='*50)
+        
+        result = backtester.run_backtest(
+            symbol=symbol,
+            start_date="2024-01-01",
+            end_date="2024-07-15"
+        )
+
+        # レポート出力
+        print(backtester.create_summary_report(result))
+        
+        # 詳細なトレード情報
+        if not result.get('error'):
+            print(f"\n戦略1トレード詳細 (最新5件):")
+            for trade in result['strategy1_trades'][-5:]:
+                print(f"  エントリー: {trade['entry_date'].strftime('%Y-%m-%d')}, "
+                      f"価格: ${trade['entry_price']:.2f}, "
+                      f"FVGギャップ: {trade['fvg_info']['gap_size_percent']:.2f}%")
