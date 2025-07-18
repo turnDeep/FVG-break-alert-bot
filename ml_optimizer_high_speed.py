@@ -13,25 +13,25 @@
 
 使用方法:
 # 最速実行（推奨）
-python ml_optimizer_enhanced.py --fast --no_cv
+python ml_optimizer_high_speed.py --fast --no_cv
 
 # 高速実行（並列処理強化）
-python ml_optimizer_enhanced.py --no_cv --n_jobs 8
+python ml_optimizer_high_speed.py --no_cv --n_jobs 8
 
 # 基本的な実行（クロスバリデーション有効）
-python ml_optimizer_enhanced.py
+python ml_optimizer_high_speed.py
 
 # クロスバリデーションを無効化（高速化）
-python ml_optimizer_enhanced.py --no_cv
+python ml_optimizer_high_speed.py --no_cv
 
 # 試行回数を指定
-python ml_optimizer_enhanced.py --n_trials 10
+python ml_optimizer_high_speed.py --n_trials 10
 
 # 無制限モード（時間をかけて高品質な最適化）
-python ml_optimizer_enhanced.py --unlimited
+python ml_optimizer_high_speed.py --unlimited
 
 # 多目的最適化モード
-python ml_optimizer_enhanced.py --mode multi_objective
+python ml_optimizer_high_speed.py --mode multi_objective
 
 高速化のヒント:
 1. --fast --no_cv を併用（最速）
@@ -296,7 +296,8 @@ class EnhancedFVGParameterOptimizer:
             'fvg_min_gap': trial.suggest_float('fvg_min_gap', 0.01, 5.0, log=True),
             'resistance_lookback': trial.suggest_int('resistance_lookback', 3, 100, step=2),
             'breakout_threshold': trial.suggest_float('breakout_threshold', 0.995, 1.05, step=0.001),
-            'stop_loss_rate': trial.suggest_float('stop_loss_rate', 0.001, 0.15, log=True),
+            # stop_loss_rateを保守的に調整（最小値を0.01から0.015に、デフォルト範囲を狭める）
+            'stop_loss_rate': trial.suggest_float('stop_loss_rate', 0.015, 0.08, log=True),
             'target_profit_rate': trial.suggest_float('target_profit_rate', 0.001, 0.3, log=True),
             'ma_proximity_percent': trial.suggest_float('ma_proximity_percent', 0.005, 0.5, log=True),
         }
@@ -504,24 +505,55 @@ class EnhancedFVGParameterOptimizer:
             def objective(trial):
                 params = {}
                 # refinementステージではカテゴリカル変数を固定し、連続値のみを最適化
+                # さらに、前ステージの最良パラメータの周辺で探索するように範囲を制限
                 if stage_name == 'refinement' and best_params_from_previous_stage:
-                    # 連続値パラメータ
-                    params['ma_period'] = trial.suggest_int('ma_period', 5, 500, step=5)
-                    params['fvg_min_gap'] = trial.suggest_float('fvg_min_gap', 0.01, 5.0, log=True)
-                    params['resistance_lookback'] = trial.suggest_int('resistance_lookback', 3, 100, step=2)
-                    params['breakout_threshold'] = trial.suggest_float('breakout_threshold', 0.995, 1.05, step=0.001)
-                    params['stop_loss_rate'] = trial.suggest_float('stop_loss_rate', 0.001, 0.15, log=True)
-                    params['target_profit_rate'] = trial.suggest_float('target_profit_rate', 0.001, 0.3, log=True)
-                    params['ma_proximity_percent'] = trial.suggest_float('ma_proximity_percent', 0.005, 0.5, log=True)
-                    params['fvg_lookback_bars'] = trial.suggest_int('fvg_lookback_bars', 3, 10)
-                    params['fvg_fill_threshold'] = trial.suggest_float('fvg_fill_threshold', 0.1, 0.9, step=0.1)
-                    params['volatility_adjustment'] = trial.suggest_float('volatility_adjustment', 0.5, 2.0, step=0.1)
-                    params['trend_strength_min'] = trial.suggest_float('trend_strength_min', 0.05, 0.95, step=0.05)
-                    params['risk_adjustment'] = trial.suggest_float('risk_adjustment', 0.8, 1.5, step=0.1)
+                    # 前ステージの最良パラメータを取得
+                    prev_ma = best_params_from_previous_stage.get('ma_period', 200)
+                    prev_gap = best_params_from_previous_stage.get('fvg_min_gap', 0.5)
+                    prev_lookback = best_params_from_previous_stage.get('resistance_lookback', 20)
+                    prev_breakout = best_params_from_previous_stage.get('breakout_threshold', 1.005)
+                    prev_stop = best_params_from_previous_stage.get('stop_loss_rate', 0.02)
+                    prev_target = best_params_from_previous_stage.get('target_profit_rate', 0.05)
+                    prev_proximity = best_params_from_previous_stage.get('ma_proximity_percent', 0.05)
+                    
+                    # 連続値パラメータ（前ステージの値の周辺で探索）
+                    params['ma_period'] = trial.suggest_int('ma_period', 
+                        max(5, prev_ma - 50), min(500, prev_ma + 50), step=5)
+                    params['fvg_min_gap'] = trial.suggest_float('fvg_min_gap', 
+                        max(0.01, prev_gap * 0.5), min(5.0, prev_gap * 2.0), log=True)
+                    params['resistance_lookback'] = trial.suggest_int('resistance_lookback', 
+                        max(3, prev_lookback - 10), min(100, prev_lookback + 10), step=2)
+                    params['breakout_threshold'] = trial.suggest_float('breakout_threshold', 
+                        max(0.995, prev_breakout - 0.01), min(1.05, prev_breakout + 0.01), step=0.001)
+                    # stop_loss_rateは保守的に調整（リスク管理強化）
+                    params['stop_loss_rate'] = trial.suggest_float('stop_loss_rate', 
+                        max(0.015, prev_stop * 0.8), min(0.08, prev_stop * 1.3), log=True)
+                    params['target_profit_rate'] = trial.suggest_float('target_profit_rate', 
+                        max(0.001, prev_target * 0.5), min(0.3, prev_target * 2.0), log=True)
+                    params['ma_proximity_percent'] = trial.suggest_float('ma_proximity_percent', 
+                        max(0.005, prev_proximity * 0.5), min(0.5, prev_proximity * 2.0), log=True)
+                    
+                    # 拡張パラメータも前ステージの値の周辺で探索
+                    prev_lookback_bars = best_params_from_previous_stage.get('fvg_lookback_bars', 5)
+                    prev_fill_threshold = best_params_from_previous_stage.get('fvg_fill_threshold', 0.5)
+                    prev_volatility = best_params_from_previous_stage.get('volatility_adjustment', 1.0)
+                    prev_trend = best_params_from_previous_stage.get('trend_strength_min', 0.5)
+                    prev_risk = best_params_from_previous_stage.get('risk_adjustment', 1.0)
+                    
+                    params['fvg_lookback_bars'] = trial.suggest_int('fvg_lookback_bars', 
+                        max(3, prev_lookback_bars - 2), min(10, prev_lookback_bars + 2))
+                    params['fvg_fill_threshold'] = trial.suggest_float('fvg_fill_threshold', 
+                        max(0.1, prev_fill_threshold - 0.2), min(0.9, prev_fill_threshold + 0.2), step=0.1)
+                    params['volatility_adjustment'] = trial.suggest_float('volatility_adjustment', 
+                        max(0.5, prev_volatility - 0.3), min(2.0, prev_volatility + 0.3), step=0.1)
+                    params['trend_strength_min'] = trial.suggest_float('trend_strength_min', 
+                        max(0.05, prev_trend - 0.2), min(0.95, prev_trend + 0.2), step=0.05)
+                    params['risk_adjustment'] = trial.suggest_float('risk_adjustment', 
+                        max(0.8, prev_risk - 0.2), min(1.5, prev_risk + 0.2), step=0.1)
 
                     # 固定するカテゴリカルパラメータ
-                    params['volume_confirmation'] = best_params_from_previous_stage.get('volume_confirmation')
-                    params['timeframe_filter'] = best_params_from_previous_stage.get('timeframe_filter')
+                    params['volume_confirmation'] = best_params_from_previous_stage.get('volume_confirmation', False)
+                    params['timeframe_filter'] = best_params_from_previous_stage.get('timeframe_filter', 'daily')
                 else:
                     # 他ステージでは全パラメータを探索
                     params = self.enhanced_parameter_ranges(trial)
@@ -602,13 +634,13 @@ class EnhancedFVGParameterOptimizer:
         return self.best_params
 
     def get_default_params(self):
-        """デフォルトパラメータを返す"""
+        """デフォルトパラメータを返す（リスク管理強化版）"""
         return {
             'ma_period': 200,
             'fvg_min_gap': 0.5,
             'resistance_lookback': 20,
             'breakout_threshold': 1.005,
-            'stop_loss_rate': 0.02,
+            'stop_loss_rate': 0.025,  # 0.02 → 0.025（少し保守的に）
             'target_profit_rate': 0.05,
             'ma_proximity_percent': 0.05,
             'fvg_lookback_bars': 5,
@@ -720,7 +752,7 @@ class EnhancedFVGParameterOptimizer:
             'fvg_min_gap': self.best_params.get('fvg_min_gap', 0.5),
             'resistance_lookback': self.best_params.get('resistance_lookback', 20),
             'breakout_threshold': self.best_params.get('breakout_threshold', 1.005),
-            'stop_loss_rate': self.best_params.get('stop_loss_rate', 0.02),
+            'stop_loss_rate': self.best_params.get('stop_loss_rate', 0.025),  # デフォルトも保守的に
             'target_profit_rate': self.best_params.get('target_profit_rate', 0.05),
             'ma_proximity_percent': self.best_params.get('ma_proximity_percent', 0.05)
         }
@@ -881,6 +913,7 @@ Best Parameters:
 • FVG Min Gap: {self.best_params.get('fvg_min_gap', 'N/A'):.3f}
 • Resistance Lookback: {self.best_params.get('resistance_lookback', 'N/A')}
 • Breakout Threshold: {self.best_params.get('breakout_threshold', 'N/A'):.3f}
+• Stop Loss Rate: {self.best_params.get('stop_loss_rate', 'N/A'):.3f}
 """
             
             ax5.text(0.05, 0.95, config_text, transform=ax5.transAxes, fontsize=10,
@@ -957,7 +990,7 @@ Best Parameters:
                 print(f"FVG_MIN_GAP_PERCENT={self.best_params.get('fvg_min_gap', 0.5)}")
                 print(f"RESISTANCE_LOOKBACK={self.best_params.get('resistance_lookback', 20)}")
                 print(f"BREAKOUT_THRESHOLD={self.best_params.get('breakout_threshold', 1.005)}")
-                print(f"STOP_LOSS_RATE={self.best_params.get('stop_loss_rate', 0.02)}")
+                print(f"STOP_LOSS_RATE={self.best_params.get('stop_loss_rate', 0.025)}")
                 print(f"TARGET_PROFIT_RATE={self.best_params.get('target_profit_rate', 0.05)}")
                 print(f"MA_PROXIMITY_PERCENT={self.best_params.get('ma_proximity_percent', 0.05)}")
                 
@@ -1100,7 +1133,7 @@ Best Parameters:
 FVG_MIN_GAP_PERCENT={self.best_params.get('fvg_min_gap', 0.5)}
 RESISTANCE_LOOKBACK={self.best_params.get('resistance_lookback', 20)}
 BREAKOUT_THRESHOLD={self.best_params.get('breakout_threshold', 1.005)}
-STOP_LOSS_RATE={self.best_params.get('stop_loss_rate', 0.02)}
+STOP_LOSS_RATE={self.best_params.get('stop_loss_rate', 0.025)}
 TARGET_PROFIT_RATE={self.best_params.get('target_profit_rate', 0.05)}
 MA_PROXIMITY_PERCENT={self.best_params.get('ma_proximity_percent', 0.05)}"""
         
@@ -1114,6 +1147,7 @@ MA_PROXIMITY_PERCENT={self.best_params.get('ma_proximity_percent', 0.05)}"""
                 <li>このレポートは最適化結果の概要です。詳細はJSONファイルを参照してください。</li>
                 <li>パラメータを本番環境に適用する前に、必ず追加のバックテストを実行してください。</li>
                 <li>市場環境の変化に応じて、定期的に再最適化を行うことを推奨します。</li>
+                <li>リスク管理パラメータ（stop_loss_rate）は保守的に設定されています。</li>
             </ul>
         </div>
     </div>
