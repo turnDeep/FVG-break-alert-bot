@@ -1,0 +1,63 @@
+{
+  "timestamp": "20250718_032654",
+  "optimization_summary": {
+    "total_trials": 5,
+    "best_score": 32.27518540209109,
+    "best_params": {
+      "ma_period": 80,
+      "fvg_min_gap": 0.9000000000000001,
+      "resistance_lookback": 35,
+      "breakout_threshold": 1.003,
+      "stop_loss_rate": 0.05,
+      "target_profit_rate": 0.1,
+      "ma_proximity_percent": 0.08
+    }
+  },
+  "backtest_results": {
+    "test_period": {
+      "start": "2024-01-01",
+      "end": "2024-06-30"
+    },
+    "strategy1_detailed": {
+      "performance_summary": {
+        "total_trades": 555,
+        "winning_trades": 297,
+        "losing_trades": 249,
+        "win_rate": 53.51351351351351,
+        "avg_win": 8.702974719769868,
+        "avg_loss": -6.6117139180558695,
+        "profit_factor": 1.570040192621161
+      },
+      "trade_examples": []
+    },
+    "strategy2_detailed": {
+      "performance_summary": {
+        "total_trades": 436,
+        "winning_trades": 283,
+        "losing_trades": 153,
+        "win_rate": 64.90825688073394,
+        "avg_win": 8.951858754887624,
+        "avg_loss": -6.22836655654282,
+        "profit_factor": 2.6584840667591405
+      },
+      "trade_examples": []
+    }
+  },
+  "all_trials": [
+    [
+      32.27518540209109
+    ],
+    [
+      9.416910063968981
+    ],
+    [
+      17.48345468547289
+    ],
+    [
+      16.583397140191327
+    ],
+    [
+      17.05485911020212
+    ]
+  ]
+}

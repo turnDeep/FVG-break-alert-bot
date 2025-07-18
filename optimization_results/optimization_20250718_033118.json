@@ -1,0 +1,455 @@
+{
+  "timestamp": "20250718_033118",
+  "optimization_summary": {
+    "total_trials": 5,
+    "best_score": 32.301408917901625,
+    "best_params": {
+      "ma_period": 70,
+      "fvg_min_gap": 1.0,
+      "resistance_lookback": 40,
+      "breakout_threshold": 1.0039999999999998,
+      "stop_loss_rate": 0.015,
+      "target_profit_rate": 0.08,
+      "ma_proximity_percent": 0.04
+    }
+  },
+  "backtest_results": {
+    "test_period": {
+      "start": "2024-01-01",
+      "end": "2024-06-30"
+    },
+    "strategy1_detailed": {
+      "performance_summary": {
+        "total_trades": 404,
+        "winning_trades": 180,
+        "losing_trades": 219,
+        "win_rate": 44.554455445544555,
+        "avg_win": 7.333626657073531,
+        "avg_loss": -5.1865264371069255,
+        "profit_factor": 1.1621724908514819
+      },
+      "trade_examples": [
+        {
+          "symbol": "AOS",
+          "entry_date": "2024-02-07T00:00:00",
+          "entry_price": 78.08362579345703,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-02-07T00:00:00",
+            "gap_top": 77.1838663238978,
+            "gap_bottom": 76.32322500700633,
+            "gap_size_percent": 1.1276270320239599,
+            "entry_price": 78.08362579345703
+          },
+          "stop_loss": 75.17837663190123,
+          "target": 84.3303158569336,
+          "s2_triggered": true,
+          "exit_date": "2024-03-07T00:00:00",
+          "exit_price": 84.74382019042969,
+          "return": 0.0852956599965001,
+          "exit_reason": "\u5229\u78ba"
+        },
+        {
+          "symbol": "ADBE",
+          "entry_date": "2024-01-09T00:00:00",
+          "entry_price": 586.2000122070312,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-01-09T00:00:00",
+            "gap_top": 577.280029296875,
+            "gap_bottom": 569.52001953125,
+            "gap_size_percent": 1.3625525880568634,
+            "entry_price": 586.2000122070312
+          },
+          "stop_loss": 560.9772192382812,
+          "target": 633.0960131835938,
+          "s2_triggered": true,
+          "exit_date": "2024-02-02T00:00:00",
+          "exit_price": 634.760009765625,
+          "return": 0.0828386157410102,
+          "exit_reason": "\u5229\u78ba"
+        },
+        {
+          "symbol": "AFL",
+          "entry_date": "2024-03-06T00:00:00",
+          "entry_price": 80.04376220703125,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-03-06T00:00:00",
+            "gap_top": 78.56290954009489,
+            "gap_bottom": 77.74454816162448,
+            "gap_size_percent": 1.0526286380481729,
+            "entry_price": 80.04376220703125
+          },
+          "stop_loss": 76.5783799392001,
+          "target": 86.44726318359376,
+          "s2_triggered": true,
+          "exit_date": "2024-05-31T00:00:00",
+          "exit_price": 88.0572738647461,
+          "return": 0.1001141305300979,
+          "exit_reason": "\u5229\u78ba"
+        },
+        {
+          "symbol": "A",
+          "entry_date": "2024-04-23T00:00:00",
+          "entry_price": 137.88145446777344,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-04-23T00:00:00",
+            "gap_top": 134.72166864866608,
+            "gap_bottom": 132.47315978229793,
+            "gap_size_percent": 1.6973316482095553,
+            "entry_price": 137.88145446777344
+          },
+          "stop_loss": 130.48606238556346,
+          "target": 148.9119708251953,
+          "s2_triggered": true,
+          "exit_date": "2024-05-14T00:00:00",
+          "exit_price": 149.8470001220703,
+          "return": 0.08678140001122153,
+          "exit_reason": "\u5229\u78ba"
+        },
+        {
+          "symbol": "GOOG",
+          "entry_date": "2024-03-19T00:00:00",
+          "entry_price": 147.0459442138672,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-03-19T00:00:00",
+            "gap_top": 146.14131773070486,
+            "gap_bottom": 143.4870858460988,
+            "gap_size_percent": 1.8498054155569936,
+            "entry_price": 147.0459442138672
+          },
+          "stop_loss": 141.33477955840732,
+          "target": 158.80961975097657,
+          "s2_triggered": true,
+          "exit_date": "2024-04-11T00:00:00",
+          "exit_price": 159.83987426757812,
+          "return": 0.08700634432394229,
+          "exit_reason": "\u5229\u78ba"
+        },
+        {
+          "symbol": "AMZN",
+          "entry_date": "2024-04-29T00:00:00",
+          "entry_price": 180.9600067138672,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-04-29T00:00:00",
+            "gap_top": 179.38999938964844,
+            "gap_bottom": 173.9199981689453,
+            "gap_size_percent": 3.1451249300207462,
+            "entry_price": 180.9600067138672
+          },
+          "stop_loss": 171.31119819641114,
+          "target": 195.43680725097659,
+          "s2_triggered": true,
+          "exit_date": "2024-06-27T00:00:00",
+          "exit_price": 197.85000610351562,
+          "return": 0.09333553693084681,
+          "exit_reason": "\u5229\u78ba"
+        },
+        {
+          "symbol": "AEP",
+          "entry_date": "2024-04-19T00:00:00",
+          "entry_price": 80.36054992675781,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-04-19T00:00:00",
+            "gap_top": 78.97667158499863,
+            "gap_bottom": 77.72641464665071,
+            "gap_size_percent": 1.608535456101591,
+            "entry_price": 80.36054992675781
+          },
+          "stop_loss": 76.56051842695095,
+          "target": 86.78939392089845,
+          "s2_triggered": true,
+          "exit_date": "2024-05-09T00:00:00",
+          "exit_price": 87.65432739257812,
+          "return": 0.09076316018827653,
+          "exit_reason": "\u5229\u78ba"
+        },
+        {
+          "symbol": "ADI",
+          "entry_date": "2024-04-24T00:00:00",
+          "entry_price": 192.41567993164062,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-04-24T00:00:00",
+            "gap_top": 190.97623319178345,
+            "gap_bottom": 184.39591410229593,
+            "gap_size_percent": 3.5685818319363647,
+            "entry_price": 192.41567993164062
+          },
+          "stop_loss": 181.6299753907615,
+          "target": 207.80893432617188,
+          "s2_triggered": true,
+          "exit_date": "2024-05-15T00:00:00",
+          "exit_price": 211.26556396484375,
+          "return": 0.09796438647775435,
+          "exit_reason": "\u5229\u78ba"
+        },
+        {
+          "symbol": "AAPL",
+          "entry_date": "2024-05-03T00:00:00",
+          "entry_price": 182.27914428710938,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-05-03T00:00:00",
+            "gap_top": 181.56346535319665,
+            "gap_bottom": 171.67319360904702,
+            "gap_size_percent": 5.761104303024058,
+            "entry_price": 182.27914428710938
+          },
+          "stop_loss": 169.09809570491132,
+          "target": 196.86147583007815,
+          "s2_triggered": true,
+          "exit_date": "2024-06-11T00:00:00",
+          "exit_price": 206.1857147216797,
+          "return": 0.1311536244481973,
+          "exit_reason": "\u5229\u78ba"
+        },
+        {
+          "symbol": "ACGL",
+          "entry_date": "2024-01-22T00:00:00",
+          "entry_price": 76.51880645751953,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-01-22T00:00:00",
+            "gap_top": 76.35715544732528,
+            "gap_bottom": 75.17803517903202,
+            "gap_size_percent": 1.5684371977602978,
+            "entry_price": 76.51880645751953
+          },
+          "stop_loss": 74.05036465134654,
+          "target": 82.64031097412109,
+          "s2_triggered": true,
+          "exit_date": "2024-02-15T00:00:00",
+          "exit_price": 83.10853576660156,
+          "return": 0.08611908123188526,
+          "exit_reason": "\u5229\u78ba"
+        }
+      ]
+    },
+    "strategy2_detailed": {
+      "performance_summary": {
+        "total_trades": 245,
+        "winning_trades": 159,
+        "losing_trades": 86,
+        "win_rate": 64.89795918367346,
+        "avg_win": 7.834160466226948,
+        "avg_loss": -5.039600956661527,
+        "profit_factor": 2.8740544138638677
+      },
+      "trade_examples": [
+        {
+          "symbol": "AOS",
+          "entry_date": "2024-02-07T00:00:00",
+          "entry_price": 78.08362579345703,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-02-07T00:00:00",
+            "gap_top": 77.1838663238978,
+            "gap_bottom": 76.32322500700633,
+            "gap_size_percent": 1.1276270320239599,
+            "entry_price": 78.08362579345703
+          },
+          "stop_loss": 75.17837663190123,
+          "target": 84.3303158569336,
+          "s2_triggered": true,
+          "entry_date_s2": "2024-02-28T00:00:00",
+          "entry_price_s2": 81.0665283203125,
+          "resistance": 80.58731585839617
+        },
+        {
+          "symbol": "ADBE",
+          "entry_date": "2024-01-09T00:00:00",
+          "entry_price": 586.2000122070312,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-01-09T00:00:00",
+            "gap_top": 577.280029296875,
+            "gap_bottom": 569.52001953125,
+            "gap_size_percent": 1.3625525880568634,
+            "entry_price": 586.2000122070312
+          },
+          "stop_loss": 560.9772192382812,
+          "target": 633.0960131835938,
+          "s2_triggered": true,
+          "entry_date_s2": "2024-01-11T00:00:00",
+          "entry_price_s2": 597.489990234375,
+          "resistance": 593.6500244140625
+        },
+        {
+          "symbol": "AFL",
+          "entry_date": "2024-03-06T00:00:00",
+          "entry_price": 80.04376220703125,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-03-06T00:00:00",
+            "gap_top": 78.56290954009489,
+            "gap_bottom": 77.74454816162448,
+            "gap_size_percent": 1.0526286380481729,
+            "entry_price": 80.04376220703125
+          },
+          "stop_loss": 76.5783799392001,
+          "target": 86.44726318359376,
+          "s2_triggered": true,
+          "entry_date_s2": "2024-04-19T00:00:00",
+          "entry_price_s2": 81.0862045288086,
+          "resistance": 79.16694195214542
+        },
+        {
+          "symbol": "A",
+          "entry_date": "2024-04-23T00:00:00",
+          "entry_price": 137.88145446777344,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-04-23T00:00:00",
+            "gap_top": 134.72166864866608,
+            "gap_bottom": 132.47315978229793,
+            "gap_size_percent": 1.6973316482095553,
+            "entry_price": 137.88145446777344
+          },
+          "stop_loss": 130.48606238556346,
+          "target": 148.9119708251953,
+          "s2_triggered": true,
+          "entry_date_s2": "2024-05-06T00:00:00",
+          "entry_price_s2": 139.27810668945312,
+          "resistance": 138.56489738661696
+        },
+        {
+          "symbol": "GOOG",
+          "entry_date": "2024-03-19T00:00:00",
+          "entry_price": 147.0459442138672,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-03-19T00:00:00",
+            "gap_top": 146.14131773070486,
+            "gap_bottom": 143.4870858460988,
+            "gap_size_percent": 1.8498054155569936,
+            "entry_price": 147.0459442138672
+          },
+          "stop_loss": 141.33477955840732,
+          "target": 158.80961975097657,
+          "s2_triggered": true,
+          "entry_date_s2": "2024-03-22T00:00:00",
+          "entry_price_s2": 150.87319946289062,
+          "resistance": 149.80455097844663
+        },
+        {
+          "symbol": "AMZN",
+          "entry_date": "2024-04-29T00:00:00",
+          "entry_price": 180.9600067138672,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-04-29T00:00:00",
+            "gap_top": 179.38999938964844,
+            "gap_bottom": 173.9199981689453,
+            "gap_size_percent": 3.1451249300207462,
+            "entry_price": 180.9600067138672
+          },
+          "stop_loss": 171.31119819641114,
+          "target": 195.43680725097659,
+          "s2_triggered": true,
+          "entry_date_s2": "2024-05-02T00:00:00",
+          "entry_price_s2": 184.72000122070312,
+          "resistance": 183.0
+        },
+        {
+          "symbol": "AEP",
+          "entry_date": "2024-04-19T00:00:00",
+          "entry_price": 80.36054992675781,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-04-19T00:00:00",
+            "gap_top": 78.97667158499863,
+            "gap_bottom": 77.72641464665071,
+            "gap_size_percent": 1.608535456101591,
+            "entry_price": 80.36054992675781
+          },
+          "stop_loss": 76.56051842695095,
+          "target": 86.78939392089845,
+          "s2_triggered": true,
+          "entry_date_s2": "2024-04-23T00:00:00",
+          "entry_price_s2": 81.65853881835938,
+          "resistance": 81.29585518247477
+        },
+        {
+          "symbol": "ADI",
+          "entry_date": "2024-04-24T00:00:00",
+          "entry_price": 192.41567993164062,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-04-24T00:00:00",
+            "gap_top": 190.97623319178345,
+            "gap_bottom": 184.39591410229593,
+            "gap_size_percent": 3.5685818319363647,
+            "entry_price": 192.41567993164062
+          },
+          "stop_loss": 181.6299753907615,
+          "target": 207.80893432617188,
+          "s2_triggered": true,
+          "entry_date_s2": "2024-04-26T00:00:00",
+          "entry_price_s2": 197.77198791503906,
+          "resistance": 195.74500786871985
+        },
+        {
+          "symbol": "AAPL",
+          "entry_date": "2024-05-03T00:00:00",
+          "entry_price": 182.27914428710938,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-05-03T00:00:00",
+            "gap_top": 181.56346535319665,
+            "gap_bottom": 171.67319360904702,
+            "gap_size_percent": 5.761104303024058,
+            "entry_price": 182.27914428710938
+          },
+          "stop_loss": 169.09809570491132,
+          "target": 196.86147583007815,
+          "s2_triggered": true,
+          "entry_date_s2": "2024-05-15T00:00:00",
+          "entry_price_s2": 188.8368682861328,
+          "resistance": 187.42348620330452
+        },
+        {
+          "symbol": "ACGL",
+          "entry_date": "2024-01-22T00:00:00",
+          "entry_price": 76.51880645751953,
+          "fvg_info": {
+            "type": "bullish",
+            "date": "2024-01-22T00:00:00",
+            "gap_top": 76.35715544732528,
+            "gap_bottom": 75.17803517903202,
+            "gap_size_percent": 1.5684371977602978,
+            "entry_price": 76.51880645751953
+          },
+          "stop_loss": 74.05036465134654,
+          "target": 82.64031097412109,
+          "s2_triggered": true,
+          "entry_date_s2": "2024-01-31T00:00:00",
+          "entry_price_s2": 78.382568359375,
+          "resistance": 77.37461400923287
+        }
+      ]
+    }
+  },
+  "all_trials": [
+    [
+      11.284633495501414
+    ],
+    [
+      32.301408917901625
+    ],
+    [
+      14.219713377208182
+    ],
+    [
+      29.502003471411857
+    ],
+    [
+      10.127975060703546
+    ]
+  ]
+}

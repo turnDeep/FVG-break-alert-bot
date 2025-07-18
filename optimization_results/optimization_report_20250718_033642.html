@@ -1,0 +1,128 @@
+
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>FVG Bot ML Optimization Results - 20250718_033642</title>
+            <style>
+                body { font-family: sans-serif; margin: 2em; }
+                .container { max-width: 1200px; margin: auto; }
+                .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+                .card { border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
+                .win { background-color: #e8f5e9; }
+                .loss { background-color: #ffebee; }
+                .trade-example { border: 1px solid #eee; padding: 10px; margin-bottom: 10px; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>FVG Bot ML Optimization Report</h1>
+                <p><b>Generated:</b> 20250718_033642</p>
+
+                <h2>Optimization Summary</h2>
+                <div class="card">
+                    <p><b>Best Score:</b> 18.9845</p>
+                    <p><b>Total Trials:</b> 5</p>
+                    <h3>Best Parameters:</h3>
+                    <pre>{
+  "ma_period": 150,
+  "fvg_min_gap": 0.6000000000000001,
+  "resistance_lookback": 35,
+  "breakout_threshold": 1.005,
+  "stop_loss_rate": 0.045000000000000005,
+  "target_profit_rate": 0.06,
+  "ma_proximity_percent": 0.09
+}</pre>
+                </div>
+
+                <h2>Backtest Results</h2>
+                <div class="grid">
+                    <div class="card">
+                        <h3>Strategy 1 (FVG Detect)</h3>
+
+            <ul>
+                <li>Total Trades: 543</li>
+                <li>Win Rate: 55.99%</li>
+                <li>Avg Win: 6.19%</li>
+                <li>Avg Loss: -6.23%</li>
+                <li>Profit Factor: 1.32</li>
+            </ul>
+
+                    </div>
+                    <div class="card">
+                        <h3>Strategy 2 (Resistance Break)</h3>
+
+            <ul>
+                <li>Total Trades: 374</li>
+                <li>Win Rate: 72.46%</li>
+                <li>Avg Win: 6.53%</li>
+                <li>Avg Loss: -6.05%</li>
+                <li>Profit Factor: 2.84</li>
+            </ul>
+
+                    </div>
+                </div>
+
+                <h2>Trade Examples</h2>
+                <div class="grid">
+                    <div class="card">
+                        <h3>Strategy 1 Examples</h3>
+
+                <div class="trade-example win">
+                    <p><b>ABBV</b> (2024-06-03T00:00:00)</p>
+                    <p>Return: 6.41% | Exit: 2024-06-10T00:00:00</p>
+                </div>
+
+                <div class="trade-example win">
+                    <p><b>ACN</b> (2024-01-10T00:00:00)</p>
+                    <p>Return: 6.72% | Exit: 2024-01-22T00:00:00</p>
+                </div>
+
+                <div class="trade-example win">
+                    <p><b>ADBE</b> (2024-01-09T00:00:00)</p>
+                    <p>Return: 6.21% | Exit: 2024-01-25T00:00:00</p>
+                </div>
+
+                <div class="trade-example win">
+                    <p><b>AMD</b> (2024-05-06T00:00:00)</p>
+                    <p>Return: 6.77% | Exit: 2024-05-20T00:00:00</p>
+                </div>
+
+                <div class="trade-example win">
+                    <p><b>AFL</b> (2024-02-07T00:00:00)</p>
+                    <p>Return: 6.17% | Exit: 2024-03-11T00:00:00</p>
+                </div>
+
+                    </div>
+                    <div class="card">
+                        <h3>Strategy 2 Examples</h3>
+
+                <div class="trade-example loss">
+                    <p><b>AFL</b> (2024-04-22T00:00:00)</p>
+                    <p>Return: 0.00% | Exit: N/A</p>
+                </div>
+
+                <div class="trade-example loss">
+                    <p><b>AMGN</b> (2024-03-22T00:00:00)</p>
+                    <p>Return: 0.00% | Exit: N/A</p>
+                </div>
+
+                <div class="trade-example loss">
+                    <p><b>BKR</b> (2024-03-06T00:00:00)</p>
+                    <p>Return: 0.00% | Exit: N/A</p>
+                </div>
+
+                <div class="trade-example loss">
+                    <p><b>CDNS</b> (2024-05-06T00:00:00)</p>
+                    <p>Return: 0.00% | Exit: N/A</p>
+                </div>
+
+                <div class="trade-example loss">
+                    <p><b>CCL</b> (2024-05-20T00:00:00)</p>
+                    <p>Return: 0.00% | Exit: N/A</p>
+                </div>
+
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
