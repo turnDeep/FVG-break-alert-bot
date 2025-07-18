@@ -432,14 +432,25 @@ class EnhancedFVGParameterOptimizer:
         sample_symbols = symbols[:min(len(symbols), 10)]
         period_days = (pd.to_datetime(end_date) - pd.to_datetime(start_date)).days
         
-        for symbol in sample_symbols:
+        for i, symbol in enumerate(sample_symbols):
             try:
                 backtester = FVGBreakBacktest(**basic_params)
                 result = backtester.run_backtest(symbol, start_date, end_date, cache_dir=cache_dir)
+
+                if i < 1: # 最初の銘柄のデバッグ情報のみ表示
+                    print(f"--- Debug Info for {symbol} ---")
+                    if result.get('error'):
+                        print(f"Error: {result['error']}")
+                    else:
+                        print(f"Trades S1: {len(result.get('strategy1_trades', []))}")
+                        print(f"Trades S2: {len(result.get('strategy2_trades', []))}")
+                        print(f"Debug Stats: {result.get('debug_info', {})}")
+
                 if not result.get('error'):
                     score = EnhancedFVGParameterOptimizer.calculate_enhanced_score(result, period_days)
                     scores.append(score)
-            except Exception:
+            except Exception as e:
+                print(f"Exception in sequential evaluation for {symbol}: {e}")
                 continue
         
         if not scores:
@@ -461,40 +472,85 @@ class EnhancedFVGParameterOptimizer:
         print(f"並列ジョブ数: {self.n_jobs}")
         
         all_results = []
-        
+        best_params_from_previous_stage = {}
+
         for stage_name, config in self.optimization_config.items():
             print(f"\n=== {stage_name.upper()} STAGE ===")
             print(f"試行回数: {config['n_trials']}")
             print(f"サンプラー: {type(config['sampler']).__name__}")
-            
+
             # 早期停止のためのコールバック
             best_score = -float('inf')
             no_improvement_count = 0
-            
+
             def early_stopping_callback(study, trial):
                 nonlocal best_score, no_improvement_count
-                
-                if trial.value > best_score:
+                if trial.value is not None and trial.value > best_score:
                     best_score = trial.value
                     no_improvement_count = 0
                 else:
                     no_improvement_count += 1
-                
-                # 10回連続で改善がない場合は早期停止
                 if no_improvement_count >= 10 and self.fast_mode:
                     study.stop()
-            
-            study = optuna.create_study(
-                direction='maximize',
-                sampler=config['sampler']
-            )
-            
+
+            # TPESampler/CmaEsSamplerに前ステージの最良解をシードする
+            if stage_name in ['exploitation', 'refinement'] and best_params_from_previous_stage:
+                if isinstance(config['sampler'], (TPESampler, CmaEsSampler)):
+                    # カテゴリカルな値をCmaEsSamplerが扱えるように数値に変換（ここでは単純に無視）
+                    cma_seed = {k: v for k, v in best_params_from_previous_stage.items() if not isinstance(v, str)}
+
+                    # CmaEsSamplerはwarm_startを直接サポートしないので、学習済みStudyを渡すか、
+                    # TPESamplerのように初期試行として追加する
+                    # ここでは、TPESamplerの機能を利用
+                    if isinstance(config['sampler'], TPESampler):
+                         study = optuna.create_study(
+                            direction='maximize',
+                            sampler=config['sampler']
+                        )
+                         study.enqueue_trial(best_params_from_previous_stage)
+                    else:
+                         study = optuna.create_study(
+                            direction='maximize',
+                            sampler=config['sampler']
+                        )
+                else:
+                    study = optuna.create_study(
+                        direction='maximize',
+                        sampler=config['sampler']
+                    )
+            else:
+                 study = optuna.create_study(
+                    direction='maximize',
+                    sampler=config['sampler']
+                )
+
             def objective(trial):
-                params = self.enhanced_parameter_ranges(trial)
-                
+                params = {}
+                # refinementステージではカテゴリカル変数を固定し、連続値のみを最適化
+                if stage_name == 'refinement' and best_params_from_previous_stage:
+                    # 連続値パラメータ
+                    params['ma_period'] = trial.suggest_int('ma_period', 5, 500, step=5)
+                    params['fvg_min_gap'] = trial.suggest_float('fvg_min_gap', 0.01, 5.0, log=True)
+                    params['resistance_lookback'] = trial.suggest_int('resistance_lookback', 3, 100, step=2)
+                    params['breakout_threshold'] = trial.suggest_float('breakout_threshold', 0.995, 1.05, step=0.001)
+                    params['stop_loss_rate'] = trial.suggest_float('stop_loss_rate', 0.001, 0.15, log=True)
+                    params['target_profit_rate'] = trial.suggest_float('target_profit_rate', 0.001, 0.3, log=True)
+                    params['ma_proximity_percent'] = trial.suggest_float('ma_proximity_percent', 0.005, 0.5, log=True)
+                    params['fvg_lookback_bars'] = trial.suggest_int('fvg_lookback_bars', 3, 10)
+                    params['fvg_fill_threshold'] = trial.suggest_float('fvg_fill_threshold', 0.1, 0.9, step=0.1)
+                    params['volatility_adjustment'] = trial.suggest_float('volatility_adjustment', 0.5, 2.0, step=0.1)
+                    params['trend_strength_min'] = trial.suggest_float('trend_strength_min', 0.05, 0.95, step=0.05)
+                    params['risk_adjustment'] = trial.suggest_float('risk_adjustment', 0.8, 1.5, step=0.1)
+
+                    # 固定するカテゴリカルパラメータ
+                    params['volume_confirmation'] = best_params_from_previous_stage.get('volume_confirmation')
+                    params['timeframe_filter'] = best_params_from_previous_stage.get('timeframe_filter')
+                else:
+                    # 他ステージでは全パラメータを探索
+                    params = self.enhanced_parameter_ranges(trial)
+
                 # 高速モードでは一部のパラメータを固定
                 if self.fast_mode and stage_name == 'exploration':
-                    # 探索段階では拡張パラメータを固定値に
                     params['fvg_lookback_bars'] = 5
                     params['fvg_fill_threshold'] = 0.5
                     params['volume_confirmation'] = False
@@ -502,17 +558,17 @@ class EnhancedFVGParameterOptimizer:
                     params['volatility_adjustment'] = 1.0
                     params['trend_strength_min'] = 0.5
                     params['risk_adjustment'] = 1.0
-                
+
                 if self.use_cross_validation and not self.fast_mode:
                     score = self.evaluate_with_cross_validation(params, symbols, start_date, end_date)
                 else:
                     score = self.evaluate_parameters(params, symbols, start_date, end_date)
-                
-                # デバッグ出力（最初の3試行のみ）
+
                 if trial.number < 3:
-                    print(f"  試行{trial.number}: スコア={score:.3f}")
-                
-                return score
+                    score_str = f"{score:.3f}" if score is not None else "N/A"
+                    print(f"  試行{trial.number}: スコア={score_str}")
+
+                return score if score is not None else -1000.0
             
             try:
                 if self.fast_mode:
@@ -538,6 +594,8 @@ class EnhancedFVGParameterOptimizer:
                 'trials': len(study.trials),
                 'sampler': type(config['sampler']).__name__
             }
+
+            best_params_from_previous_stage = study.best_params
             
             self.multi_stage_results[stage_name] = stage_results
             all_results.extend(study.trials)

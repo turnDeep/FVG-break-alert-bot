@@ -1,6 +1,6 @@
 {
   "optimization_metadata": {
-    "timestamp": "20250718_114002",
+    "timestamp": "20250718_125748",
     "unlimited_mode": false,
     "optimization_config": {
       "exploration": {
@@ -18,38 +18,38 @@
     }
   },
   "best_params": {
-    "ma_period": 270,
-    "fvg_min_gap": 0.07333189906008225,
-    "resistance_lookback": 85,
-    "breakout_threshold": 1.034,
-    "stop_loss_rate": 0.0010230669870812921,
-    "target_profit_rate": 0.0013828521979935165,
-    "ma_proximity_percent": 0.032448218637806045,
-    "fvg_lookback_bars": 9,
+    "ma_period": 210,
+    "fvg_min_gap": 0.18421741529277147,
+    "resistance_lookback": 15,
+    "breakout_threshold": 1.04,
+    "stop_loss_rate": 0.049982573935383745,
+    "target_profit_rate": 0.27139679856738885,
+    "ma_proximity_percent": 0.006516693727780609,
+    "fvg_lookback_bars": 4,
     "fvg_fill_threshold": 0.30000000000000004,
     "volume_confirmation": false,
-    "timeframe_filter": "1h",
-    "volatility_adjustment": 0.5,
+    "timeframe_filter": "4h",
+    "volatility_adjustment": 0.8,
     "trend_strength_min": 0.6500000000000001,
-    "risk_adjustment": 0.8
+    "risk_adjustment": 1.2000000000000002
   },
   "multi_stage_results": {
     "exploration": {
       "best_params": {
-        "ma_period": 270,
-        "fvg_min_gap": 0.07333189906008225,
-        "resistance_lookback": 85,
-        "breakout_threshold": 1.034,
-        "stop_loss_rate": 0.0010230669870812921,
-        "target_profit_rate": 0.0013828521979935165,
-        "ma_proximity_percent": 0.032448218637806045,
-        "fvg_lookback_bars": 9,
+        "ma_period": 210,
+        "fvg_min_gap": 0.18421741529277147,
+        "resistance_lookback": 15,
+        "breakout_threshold": 1.04,
+        "stop_loss_rate": 0.049982573935383745,
+        "target_profit_rate": 0.27139679856738885,
+        "ma_proximity_percent": 0.006516693727780609,
+        "fvg_lookback_bars": 4,
         "fvg_fill_threshold": 0.30000000000000004,
         "volume_confirmation": false,
-        "timeframe_filter": "1h",
-        "volatility_adjustment": 0.5,
+        "timeframe_filter": "4h",
+        "volatility_adjustment": 0.8,
         "trend_strength_min": 0.6500000000000001,
-        "risk_adjustment": 0.8
+        "risk_adjustment": 1.2000000000000002
       },
       "best_score": -1000.0,
       "trials": 11,
@@ -57,20 +57,20 @@
     },
     "exploitation": {
       "best_params": {
-        "ma_period": 190,
-        "fvg_min_gap": 3.6808608148776107,
-        "resistance_lookback": 73,
-        "breakout_threshold": 1.028,
-        "stop_loss_rate": 0.0021852986613813824,
-        "target_profit_rate": 0.0024345423962016913,
-        "ma_proximity_percent": 0.00653336961902664,
-        "fvg_lookback_bars": 9,
-        "fvg_fill_threshold": 0.6,
-        "volume_confirmation": true,
-        "timeframe_filter": "1h",
-        "volatility_adjustment": 0.7,
-        "trend_strength_min": 0.2,
-        "risk_adjustment": 1.0
+        "ma_period": 210,
+        "fvg_min_gap": 0.18421741529277147,
+        "resistance_lookback": 15,
+        "breakout_threshold": 1.04,
+        "stop_loss_rate": 0.049982573935383745,
+        "target_profit_rate": 0.27139679856738885,
+        "ma_proximity_percent": 0.006516693727780609,
+        "fvg_lookback_bars": 4,
+        "fvg_fill_threshold": 0.30000000000000004,
+        "volume_confirmation": false,
+        "timeframe_filter": "4h",
+        "volatility_adjustment": 0.8,
+        "trend_strength_min": 0.6500000000000001,
+        "risk_adjustment": 1.2000000000000002
       },
       "best_score": -1000.0,
       "trials": 11,
@@ -87,11 +87,9 @@
         "ma_proximity_percent": 0.00653336961902664,
         "fvg_lookback_bars": 9,
         "fvg_fill_threshold": 0.6,
-        "volume_confirmation": true,
-        "timeframe_filter": "1h",
-        "volatility_adjustment": 0.7,
-        "trend_strength_min": 0.2,
-        "risk_adjustment": 1.0
+        "volatility_adjustment": 1.6,
+        "trend_strength_min": 0.05,
+        "risk_adjustment": 1.5
       },
       "best_score": -1000.0,
       "trials": 10,
