@@ -1,6 +1,5 @@
 """
-改善版バックテストモジュール - FVG & レジスタンス突破戦略の過去検証
-画像の3つのトレード例を再現できるように改善
+バックテストモジュール - FVG & レジスタンス突破戦略の過去検証
 """
 import warnings
 warnings.simplefilter(action='error', category=FutureWarning)
