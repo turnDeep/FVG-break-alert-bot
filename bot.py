@@ -406,7 +406,6 @@ async def post_alerts(notifier, alerts):
             await notifier.send_embed(embed=embed) # チャートなしで再送
 
 # --- Discord Bot Events and Commands ---
-from optimization_manager import OptimizationManager
 
 @bot.event
 async def on_ready():
@@ -421,67 +420,14 @@ async def on_ready():
 async def on_guild_join(guild):
     await setup_guild(guild)
 
-@tasks.loop(minutes=SCAN_INTERVAL)
-async def market_scan_task():
-    if not is_us_market_open(): return
-    print(f"[{datetime.now(ET).strftime('%Y-%m-%d %H:%M ET')}] リアルタイムスキャン開始...")
-    alerts = await scan_symbols(data_period="1y", data_interval=f"{SCAN_INTERVAL}m")
-    for guild_id, config in server_configs.items():
-        if config.get("enabled") and config.get("alert_channel"):
-            await post_alerts(config["alert_channel"], alerts)
-
 @bot.command(name="status")
 async def bot_status(ctx):
     # ... (statusコマンドの実装は変更なし)
     embed = discord.Embed(title="Bot Status", color=discord.Color.blue())
-    embed.add_field(name="Mode", value="Realtime" if market_scan_task.is_running() else "Idle/Daily", inline=False)
+    embed.add_field(name="Mode", value="Idle/Daily", inline=False)
     embed.add_field(name="Watched Symbols", value=str(len(watched_symbols)))
     await ctx.send(embed=embed)
     pass
-
-@bot.command(name="optimize")
-async def run_optimization_command(ctx, trials: int = 20):
-    """MLによるパラメータ最適化を実行します。"""
-    await ctx.send(f"🧪 ML最適化を開始します... (試行回数: {trials}回). この処理は数分から数時間かかることがあります。")
-
-    try:
-        loop = asyncio.get_event_loop()
-        manager = OptimizationManager(n_trials=trials)
-
-        # 最適化 (ブロッキング処理なのでexecutorで実行)
-        await ctx.send("ステップ1/4: 最適なパラメータを探索中...")
-        best_params = await loop.run_in_executor(
-            None, manager.run_optimization, "2023-01-01", "2023-12-31"
-        )
-        await ctx.send(f"最適パラメータが見つかりました: ```json\n{json.dumps(best_params, indent=2)}```")
-
-        # フルバックテスト
-        await ctx.send("ステップ2/4: 見つかったパラメータで詳細なバックテストを実行中...")
-        backtest_results = await loop.run_in_executor(
-            None, manager.run_full_backtest, best_params, "2024-01-01", "2024-06-30"
-        )
-
-        # 結果を保存
-        await ctx.send("ステップ3/4: 結果をJSONファイルに保存中...")
-        json_path = await loop.run_in_executor(
-            None, manager.save_optimization_results, backtest_results
-        )
-
-        # HTMLレポートを生成
-        await ctx.send("ステップ4/4: HTMLレポートを生成中...")
-        html_path = await loop.run_in_executor(
-            None, manager.generate_html_report, json_path
-        )
-
-        await ctx.send(
-            "✅ **最適化完了！**\n"
-            f"結果サマリーとレポートを確認してください。",
-            files=[discord.File(json_path), discord.File(html_path)]
-        )
-
-    except Exception as e:
-        await ctx.send(f"❌ エラーが発生しました: {e}")
-        print(f"Optimization Error: {e}")
 
 @bot.command(name="backtest")
 async def run_backtest_command(ctx, symbol: str, start_date: str = "2023-01-01", end_date: str = "2023-12-31"):
@@ -548,75 +494,35 @@ async def run_daily_scan(mock=False):
         else:
             print("投稿先チャンネルが見つかりません。")
 
-class MockContext:
-    """`optimize`コマンドのテスト用モックコンテキスト"""
-    def __init__(self):
-        self.notifier = MockDiscordNotifier("optimize-test")
-
-    async def send(self, message, files=None):
-        # ファイルがある場合は、ファイルパスも表示
-        if files:
-            file_paths = [f.filename for f in files]
-            await self.notifier.send_message(f"{message}\nAttached: {', '.join(file_paths)}")
-        else:
-            await self.notifier.send_message(message)
-
-async def run_realtime_bot(mock=False, command_to_test=None):
-    """リアルタイムスキャンモードでBotを起動、またはコマンドをテスト"""
-    if mock:
-        if command_to_test == 'optimize':
-            print("🤖 `!optimize`コマンドのモックテストを実行します...")
-            ctx = MockContext()
-            await run_optimization_command(ctx, trials=5)
-        else:
-             print("🤖 リアルタイムスキャンのモックループを開始します...")
-             # (既存のモックループ)
-             async def mock_loop():
-                while True:
-                    print(f"\n[{datetime.now(ET).strftime('%Y-%m-%d %H:%M ET')}] モックリアルタイムスキャン開始...")
-                    alerts = await scan_symbols(data_period="1y", data_interval=f"{SCAN_INTERVAL}m")
-                    notifier = MockDiscordNotifier()
-                    await post_alerts(notifier, alerts)
-                    await asyncio.sleep(SCAN_INTERVAL * 60)
-             await mock_loop()
-
-    else:
-        if not DISCORD_BOT_TOKEN or DISCORD_BOT_TOKEN == "YOUR_DISCORD_BOT_TOKEN_HERE":
-            print("リアルタイムモードにはDISCORD_BOT_TOKENが必要です。")
-            return
-        print("🤖 リアルタイムスキャンモードで起動します...")
-        market_scan_task.start() # Test: コマンドテストのため、自動スキャンは一時的に無効化
-        await bot.start(DISCORD_BOT_TOKEN)
-
 def main():
-    if len(sys.argv) > 1:
-        mode = sys.argv[1]
-        mock = '--mock' in sys.argv
+    """メイン実行関数"""
+    mock = '--mock' in sys.argv
 
-        if mode == 'daily':
-            loop = asyncio.get_event_loop()
-            if not mock:
-                # 通常モードの場合のみログイン
-                loop.run_until_complete(bot.login(DISCORD_BOT_TOKEN))
-                loop.run_until_complete(bot.fetch_guilds().flatten())
-                for guild in bot.guilds:
-                    loop.run_until_complete(setup_guild(guild))
+    # dailyモードのみサポート
+    loop = asyncio.get_event_loop()
+    if not mock:
+        if not DISCORD_BOT_TOKEN or DISCORD_BOT_TOKEN == "YOUR_DISCORD_BOT_TOKEN_HERE":
+            print("Discord Bot Tokenが設定されていません。.envファイルを確認してください。")
+            return
 
-            loop.run_until_complete(run_daily_scan(mock=mock))
+        # Botにログインし、サーバー情報を準備
+        print("BotをDiscordにログインさせています...")
+        loop.run_until_complete(bot.login(DISCORD_BOT_TOKEN))
+        # on_readyが呼ばれる前にguildsをキャッシュしておく
+        loop.run_until_complete(bot.fetch_guilds().flatten())
+        for guild in bot.guilds:
+            loop.run_until_complete(setup_guild(guild))
+        print("サーバー情報の準備完了。")
 
-            if not mock:
-                loop.run_until_complete(bot.close())
+    # 日次スキャンを実行
+    loop.run_until_complete(run_daily_scan(mock=mock))
 
-        elif mode == 'realtime':
-            command_to_test = None
-            if mock and '--command=optimize' in sys.argv:
-                command_to_test = 'optimize'
-            asyncio.run(run_realtime_bot(mock=mock, command_to_test=command_to_test))
-        else:
-            print(f"未定義のモード: {mode}")
-            print("使用可能なモード: 'daily', 'realtime'")
-    else:
-        print("実行モードを指定してください。例: python bot.py realtime")
+    if not mock:
+        # Botをログアウト
+        print("処理が完了したため、Botをログアウトします。")
+        loop.run_until_complete(bot.close())
+
+    print("プログラムを終了します。")
 
 if __name__ == "__main__":
     main()
