@@ -1204,24 +1204,36 @@ def main():
     # 最適化実行
     start_time = time.time()
     
+    # 動的な日付設定
+    today = datetime.now()
+    training_end_date = today - timedelta(days=2*365)  # 2年前
+    training_start_date = today - timedelta(days=10*365) # 10年前
+    validation_start_date = training_end_date
+    validation_end_date = today
+
+    training_start_str = training_start_date.strftime('%Y-%m-%d')
+    training_end_str = training_end_date.strftime('%Y-%m-%d')
+    validation_start_str = validation_start_date.strftime('%Y-%m-%d')
+    validation_end_str = validation_end_date.strftime('%Y-%m-%d')
+
     try:
         if args.mode == 'multi_stage':
             print("🚀 多段階最適化を実行中...")
             best_params = optimizer.multi_stage_optimization(
-                symbols, '2022-01-01', '2024-01-01'
+                symbols, training_start_str, training_end_str
             )
         elif args.mode == 'multi_objective':
             print("🎯 多目的最適化を実行中...")
             # 高速モードでは試行回数を削減
             n_trials = 100 if args.fast else (1000 if args.unlimited else 200)
             best_params = optimizer.multi_objective_optimization(
-                symbols, '2022-01-01', '2024-01-01',
+                symbols, training_start_str, training_end_str,
                 n_trials=n_trials
             )
         elif args.mode == 'walk_forward':
             print("📈 Walk-Forward最適化を実行中...")
             best_params = optimizer.multi_stage_optimization(
-                symbols, '2022-01-01', '2024-01-01'
+                symbols, training_start_str, training_end_str
             )
     except Exception as e:
         print(f"最適化エラー: {e}")
@@ -1234,7 +1246,7 @@ def main():
     # 検証実行
     print("\n📊 検証を実行中...")
     try:
-        validation_results = optimizer.comprehensive_validation('2024-01-01', '2024-12-31')
+        validation_results = optimizer.comprehensive_validation(validation_start_str, validation_end_str)
         optimizer.validation_results = validation_results
     except Exception as e:
         print(f"検証エラー: {e}")
