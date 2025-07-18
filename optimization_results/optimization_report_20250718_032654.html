@@ -1,0 +1,78 @@
+
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>FVG Bot ML Optimization Results - 20250718_032654</title>
+            <style>
+                body { font-family: sans-serif; margin: 2em; }
+                .container { max-width: 1200px; margin: auto; }
+                .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+                .card { border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
+                .win { background-color: #e8f5e9; }
+                .loss { background-color: #ffebee; }
+                .trade-example { border: 1px solid #eee; padding: 10px; margin-bottom: 10px; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>FVG Bot ML Optimization Report</h1>
+                <p><b>Generated:</b> 20250718_032654</p>
+
+                <h2>Optimization Summary</h2>
+                <div class="card">
+                    <p><b>Best Score:</b> 32.2752</p>
+                    <p><b>Total Trials:</b> 5</p>
+                    <h3>Best Parameters:</h3>
+                    <pre>{
+  "ma_period": 80,
+  "fvg_min_gap": 0.9000000000000001,
+  "resistance_lookback": 35,
+  "breakout_threshold": 1.003,
+  "stop_loss_rate": 0.05,
+  "target_profit_rate": 0.1,
+  "ma_proximity_percent": 0.08
+}</pre>
+                </div>
+
+                <h2>Backtest Results</h2>
+                <div class="grid">
+                    <div class="card">
+                        <h3>Strategy 1 (FVG Detect)</h3>
+
+            <ul>
+                <li>Total Trades: 555</li>
+                <li>Win Rate: 53.51%</li>
+                <li>Avg Win: 8.70%</li>
+                <li>Avg Loss: -6.61%</li>
+                <li>Profit Factor: 1.57</li>
+            </ul>
+
+                    </div>
+                    <div class="card">
+                        <h3>Strategy 2 (Resistance Break)</h3>
+
+            <ul>
+                <li>Total Trades: 436</li>
+                <li>Win Rate: 64.91%</li>
+                <li>Avg Win: 8.95%</li>
+                <li>Avg Loss: -6.23%</li>
+                <li>Profit Factor: 2.66</li>
+            </ul>
+
+                    </div>
+                </div>
+
+                <h2>Trade Examples</h2>
+                <div class="grid">
+                    <div class="card">
+                        <h3>Strategy 1 Examples</h3>
+
+                    </div>
+                    <div class="card">
+                        <h3>Strategy 2 Examples</h3>
+
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
