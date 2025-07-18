@@ -222,9 +222,6 @@ class EnhancedFVGParameterOptimizer:
                     except Exception as e:
                         print(f"エラー: {symbol} のデータ取得に失敗 - {e}")
 
-            if i + 30 < len(symbols):
-                print("レート制限回避のため60秒待機します...")
-                time.sleep(60)
 
         # キャッシュされた有効なシンボルのみを返す
         valid_symbols = [s for s in symbols if os.path.exists(os.path.join(cache_dir, f"{s}.csv"))]
