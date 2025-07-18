@@ -1171,7 +1171,7 @@ def main():
     """メイン実行関数"""
     parser = argparse.ArgumentParser(description='Enhanced FVG Parameter Optimization')
     parser.add_argument('--mode', choices=['multi_stage', 'multi_objective', 'walk_forward'], 
-                       default='multi_stage', help='Optimization mode')
+                       default='multi_objective', help='Optimization mode')
     parser.add_argument('--unlimited', action='store_true', help='Enable unlimited mode (time-intensive)')
     parser.add_argument('--n_trials', type=int, default=None, help='Number of trials per stage')
     parser.add_argument('--no_cv', action='store_true', help='Disable cross-validation (faster but may overfit)')
