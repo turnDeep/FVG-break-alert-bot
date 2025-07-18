@@ -1,6 +1,6 @@
 {
   "optimization_metadata": {
-    "timestamp": "20250718_131834",
+    "timestamp": "20250718_133240",
     "unlimited_mode": false,
     "optimization_config": {
       "exploration": {
@@ -18,82 +18,42 @@
     }
   },
   "best_params": {
-    "ma_period": 305,
-    "fvg_min_gap": 0.6022355709911287,
-    "resistance_lookback": 97,
-    "breakout_threshold": 1.001,
-    "stop_loss_rate": 0.0011300547012332105,
-    "target_profit_rate": 0.06880200915339217,
-    "ma_proximity_percent": 0.39006922792664966,
-    "fvg_lookback_bars": 6,
-    "fvg_fill_threshold": 0.4,
-    "volume_confirmation": false,
+    "ma_period": 115,
+    "fvg_min_gap": 0.5977620423185935,
+    "resistance_lookback": 13,
+    "breakout_threshold": 1.012,
+    "stop_loss_rate": 0.018410831547550195,
+    "target_profit_rate": 0.05396223489590214,
+    "ma_proximity_percent": 0.10038682121444416,
+    "fvg_lookback_bars": 3,
+    "fvg_fill_threshold": 0.1,
+    "volume_confirmation": true,
     "timeframe_filter": "daily",
-    "volatility_adjustment": 1.9000000000000001,
-    "trend_strength_min": 0.7000000000000001,
-    "risk_adjustment": 1.5
+    "volatility_adjustment": 1.0,
+    "trend_strength_min": 0.4,
+    "risk_adjustment": 1.1
   },
   "multi_stage_results": {
     "exploration": {
       "best_params": {
-        "ma_period": 305,
-        "fvg_min_gap": 0.6022355709911287,
-        "resistance_lookback": 97,
-        "breakout_threshold": 1.001,
-        "stop_loss_rate": 0.0011300547012332105,
-        "target_profit_rate": 0.06880200915339217,
-        "ma_proximity_percent": 0.39006922792664966,
-        "fvg_lookback_bars": 6,
-        "fvg_fill_threshold": 0.4,
-        "volume_confirmation": false,
+        "ma_period": 115,
+        "fvg_min_gap": 0.5977620423185935,
+        "resistance_lookback": 13,
+        "breakout_threshold": 1.012,
+        "stop_loss_rate": 0.018410831547550195,
+        "target_profit_rate": 0.05396223489590214,
+        "ma_proximity_percent": 0.10038682121444416,
+        "fvg_lookback_bars": 3,
+        "fvg_fill_threshold": 0.1,
+        "volume_confirmation": true,
         "timeframe_filter": "daily",
-        "volatility_adjustment": 1.9000000000000001,
-        "trend_strength_min": 0.7000000000000001,
-        "risk_adjustment": 1.5
+        "volatility_adjustment": 1.0,
+        "trend_strength_min": 0.4,
+        "risk_adjustment": 1.1
       },
-      "best_score": -1000.0,
-      "trials": 11,
+      "best_score": 381.7222282796624,
+      "trials": 12,
       "sampler": "RandomSampler"
-    },
-    "exploitation": {
-      "best_params": {
-        "ma_period": 305,
-        "fvg_min_gap": 0.6022355709911287,
-        "resistance_lookback": 97,
-        "breakout_threshold": 1.001,
-        "stop_loss_rate": 0.0011300547012332105,
-        "target_profit_rate": 0.06880200915339217,
-        "ma_proximity_percent": 0.39006922792664966,
-        "fvg_lookback_bars": 6,
-        "fvg_fill_threshold": 0.4,
-        "volume_confirmation": false,
-        "timeframe_filter": "daily",
-        "volatility_adjustment": 1.9000000000000001,
-        "trend_strength_min": 0.7000000000000001,
-        "risk_adjustment": 1.5
-      },
-      "best_score": -1000.0,
-      "trials": 11,
-      "sampler": "TPESampler"
-    },
-    "refinement": {
-      "best_params": {
-        "ma_period": 190,
-        "fvg_min_gap": 3.6808608148776107,
-        "resistance_lookback": 73,
-        "breakout_threshold": 1.028,
-        "stop_loss_rate": 0.0021852986613813824,
-        "target_profit_rate": 0.0024345423962016913,
-        "ma_proximity_percent": 0.00653336961902664,
-        "fvg_lookback_bars": 9,
-        "fvg_fill_threshold": 0.6,
-        "volatility_adjustment": 1.6,
-        "trend_strength_min": 0.05,
-        "risk_adjustment": 1.5
-      },
-      "best_score": -1000.0,
-      "trials": 10,
-      "sampler": "CmaEsSampler"
     }
   },
   "pareto_solutions": [],

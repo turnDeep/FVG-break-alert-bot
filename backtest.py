@@ -9,6 +9,8 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
+from curl_cffi import requests
+import time
 
 class FVGBreakBacktest:
     """FVG突破戦略のバックテストクラス"""
@@ -100,16 +102,16 @@ class FVGBreakBacktest:
         # MA計算のために十分なデータを確保
         fetch_start_date = start_date_dt - timedelta(days=self.ma_period * 2)
 
+        session = requests.Session(impersonate="safari15_5")
         retries = 3
         df_daily_full = pd.DataFrame() # 空のデータフレームで初期化
         for i in range(retries):
             try:
-                df_daily_full = yf.download(
-                    symbol,
+                ticker_obj = yf.Ticker(symbol, session=session)
+                df_daily_full = ticker_obj.history(
                     start=fetch_start_date,
                     end=end_date_dt,
-                    auto_adjust=False,
-                    progress=False
+                    auto_adjust=False
                 )
                 if not df_daily_full.empty:
                     break
@@ -123,31 +125,45 @@ class FVGBreakBacktest:
         if df_daily_full.empty or not all(col in df_daily_full.columns for col in required_columns):
             return {"error": f"データ取得エラーまたはカラム不足: {symbol}"}
 
-        df_full_period = df_daily_full.copy()
+        df_daily_full.index = df_daily_full.index.tz_localize(None)
 
         # 週次データを作成
-        df_weekly_full = df_full_period.resample('W-MON').agg({
-            'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
+        df_weekly_full = df_daily_full.resample('W-MON').agg({
+            'Open': 'first',
+            'High': 'max',
+            'Low': 'min',
+            'Close': 'last',
+            'Volume': 'sum'
         }).dropna()
 
         # 移動平均計算
-        df_full_period['MA200'] = df_full_period['Close'].rolling(window=self.ma_period).mean()
+        df_daily_full['MA200'] = df_daily_full['Close'].rolling(window=self.ma_period).mean()
         df_weekly_full['SMA200'] = df_weekly_full['Close'].rolling(window=self.ma_period).mean()
 
-        # 週次SMAを日次データにマージ
-        df_with_weekly = df_full_period.reset_index()
-        df_weekly_full = df_weekly_full.reset_index()
+        # 週次SMAを日次データにマージ (より堅牢な方法)
+        if df_daily_full.index.tz is not None:
+            df_daily_full.index = df_daily_full.index.tz_localize(None)
+        if df_weekly_full.index.tz is not None:
+            df_weekly_full.index = df_weekly_full.index.tz_localize(None)
 
-        df_with_weekly['Week_Start'] = pd.to_datetime(df_with_weekly['Date']).dt.to_period('W-MON').apply(lambda r: r.start_time)
-        df_weekly_full['Week_Start'] = pd.to_datetime(df_weekly_full['Date']).dt.to_period('W-MON').apply(lambda r: r.start_time)
+        df_daily_full_reset = df_daily_full.reset_index()
+        df_weekly_full_reset = df_weekly_full.reset_index()
 
-        df_merged = pd.merge(df_with_weekly, df_weekly_full[['Week_Start', 'SMA200']], on='Week_Start', how='left')
-        df_merged = df_merged.set_index('Date')
-        df_merged.rename(columns={'SMA200': 'Weekly_SMA200'}, inplace=True)
-        df_merged['Weekly_SMA200'] = df_merged['Weekly_SMA200'].ffill()
+        df_daily_full_reset['Week_Start'] = pd.to_datetime(df_daily_full_reset['Date']).dt.to_period('W-MON').apply(lambda r: r.start_time)
+        df_weekly_full_reset['Week_Start'] = pd.to_datetime(df_weekly_full_reset['Date']).dt.to_period('W-MON').apply(lambda r: r.start_time)
+
+        df_daily_full = pd.merge(df_daily_full_reset,
+                                 df_weekly_full_reset[['Week_Start', 'SMA200']],
+                                 on='Week_Start',
+                                 how='left',
+                                 suffixes=('', '_weekly'))
+
+        df_daily_full = df_daily_full.set_index('Date')
+        df_daily_full.rename(columns={'SMA200': 'Weekly_SMA200'}, inplace=True)
+        df_daily_full['Weekly_SMA200'] = df_daily_full['Weekly_SMA200'].ffill()
         
-        # バックテスト期間のデータを抽出
-        df_daily = df_merged.loc[start_date_dt:end_date_dt].copy()
+        # 元の期間にデータをトリム
+        df_daily = df_daily_full.loc[start_date_dt:end_date].copy()
         
         # トレード記録
         strategy1_trades = [] # FVG
