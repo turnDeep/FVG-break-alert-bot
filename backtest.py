@@ -4,6 +4,7 @@
 import warnings
 warnings.simplefilter(action='error', category=FutureWarning)
 import yfinance as yf
+import os
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -91,27 +92,39 @@ class FVGBreakBacktest:
 
         return unique_highs[:3]
 
-    def run_backtest(self, symbol: str, start_date: str, end_date: str) -> Dict:
+    def run_backtest(self, symbol: str, start_date: str, end_date: str, cache_dir="sp500_data") -> Dict:
         """バックテストを実行"""
+        cache_path = os.path.join(cache_dir, f"{symbol}.csv")
+        if not os.path.exists(cache_path):
+            return {"error": f"キャッシュデータなし: {symbol}"}
+
+        try:
+            df_daily_full = pd.read_csv(cache_path, index_col='Date', parse_dates=True)
+        except Exception as e:
+            return {"error": f"キャッシュ読み込みエラー: {e}"}
+
         # データ取得期間をMA期間分だけ過去に広げる
         start_date_dt = pd.to_datetime(start_date)
-        # 週足MAのために、ma_period週 * 7日分のデータを余分に取得
         fetch_start_date = start_date_dt - timedelta(days=self.ma_period * 7)
 
-        stock = yf.Ticker(symbol)
-        df_daily_full = stock.history(start=fetch_start_date, end=end_date)
-        df_weekly_full = stock.history(start=fetch_start_date, end=end_date, interval="1wk")
-
-        if df_daily_full.empty or df_weekly_full.empty:
-            return {"error": "データ取得失敗"}
+        # 週次データを作成
+        df_weekly_full = df_daily_full.resample('W-MON').agg({
+            'Open': 'first',
+            'High': 'max',
+            'Low': 'min',
+            'Close': 'last',
+            'Volume': 'sum'
+        }).dropna()
 
         # 移動平均計算
         df_daily_full['MA200'] = df_daily_full['Close'].rolling(window=self.ma_period).mean()
         df_weekly_full['SMA200'] = df_weekly_full['Close'].rolling(window=self.ma_period).mean()
 
         # 週次SMAを日次データにマージ (より堅牢な方法)
-        df_daily_full.index = df_daily_full.index.tz_localize(None)
-        df_weekly_full.index = df_weekly_full.index.tz_localize(None)
+        if df_daily_full.index.tz is not None:
+            df_daily_full.index = df_daily_full.index.tz_localize(None)
+        if df_weekly_full.index.tz is not None:
+            df_weekly_full.index = df_weekly_full.index.tz_localize(None)
 
         df_daily_full_reset = df_daily_full.reset_index()
         df_weekly_full_reset = df_weekly_full.reset_index()

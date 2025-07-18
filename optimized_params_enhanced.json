@@ -1,6 +1,6 @@
 {
   "optimization_metadata": {
-    "timestamp": "20250717_224600",
+    "timestamp": "20250718_114002",
     "unlimited_mode": false,
     "optimization_config": {
       "exploration": {
@@ -18,79 +18,88 @@
     }
   },
   "best_params": {
-    "ma_period": 5,
-    "fvg_min_gap": 0.010735410833940291,
-    "resistance_lookback": 5,
-    "breakout_threshold": 1.004,
-    "stop_loss_rate": 0.13573881728235276,
-    "target_profit_rate": 0.0014732847986821825,
-    "ma_proximity_percent": 0.005720234320483288,
-    "fvg_lookback_bars": 5,
-    "fvg_fill_threshold": 0.2,
-    "volume_confirmation": true,
+    "ma_period": 270,
+    "fvg_min_gap": 0.07333189906008225,
+    "resistance_lookback": 85,
+    "breakout_threshold": 1.034,
+    "stop_loss_rate": 0.0010230669870812921,
+    "target_profit_rate": 0.0013828521979935165,
+    "ma_proximity_percent": 0.032448218637806045,
+    "fvg_lookback_bars": 9,
+    "fvg_fill_threshold": 0.30000000000000004,
+    "volume_confirmation": false,
     "timeframe_filter": "1h",
-    "volatility_adjustment": 1.4,
-    "trend_strength_min": 0.05,
-    "risk_adjustment": 1.4000000000000001
+    "volatility_adjustment": 0.5,
+    "trend_strength_min": 0.6500000000000001,
+    "risk_adjustment": 0.8
   },
   "multi_stage_results": {
     "exploration": {
       "best_params": {
-        "ma_period": 5,
-        "fvg_min_gap": 0.010735410833940291,
-        "resistance_lookback": 5,
-        "breakout_threshold": 1.004,
-        "stop_loss_rate": 0.13573881728235276,
-        "target_profit_rate": 0.0014732847986821825,
-        "ma_proximity_percent": 0.005720234320483288,
-        "fvg_lookback_bars": 5,
-        "fvg_fill_threshold": 0.2,
+        "ma_period": 270,
+        "fvg_min_gap": 0.07333189906008225,
+        "resistance_lookback": 85,
+        "breakout_threshold": 1.034,
+        "stop_loss_rate": 0.0010230669870812921,
+        "target_profit_rate": 0.0013828521979935165,
+        "ma_proximity_percent": 0.032448218637806045,
+        "fvg_lookback_bars": 9,
+        "fvg_fill_threshold": 0.30000000000000004,
+        "volume_confirmation": false,
+        "timeframe_filter": "1h",
+        "volatility_adjustment": 0.5,
+        "trend_strength_min": 0.6500000000000001,
+        "risk_adjustment": 0.8
+      },
+      "best_score": -1000.0,
+      "trials": 11,
+      "sampler": "RandomSampler"
+    },
+    "exploitation": {
+      "best_params": {
+        "ma_period": 190,
+        "fvg_min_gap": 3.6808608148776107,
+        "resistance_lookback": 73,
+        "breakout_threshold": 1.028,
+        "stop_loss_rate": 0.0021852986613813824,
+        "target_profit_rate": 0.0024345423962016913,
+        "ma_proximity_percent": 0.00653336961902664,
+        "fvg_lookback_bars": 9,
+        "fvg_fill_threshold": 0.6,
         "volume_confirmation": true,
         "timeframe_filter": "1h",
-        "volatility_adjustment": 1.4,
-        "trend_strength_min": 0.05,
-        "risk_adjustment": 1.4000000000000001
+        "volatility_adjustment": 0.7,
+        "trend_strength_min": 0.2,
+        "risk_adjustment": 1.0
       },
-      "best_score": 34.01758352246279,
-      "trials": 13,
-      "sampler": "RandomSampler"
+      "best_score": -1000.0,
+      "trials": 11,
+      "sampler": "TPESampler"
+    },
+    "refinement": {
+      "best_params": {
+        "ma_period": 190,
+        "fvg_min_gap": 3.6808608148776107,
+        "resistance_lookback": 73,
+        "breakout_threshold": 1.028,
+        "stop_loss_rate": 0.0021852986613813824,
+        "target_profit_rate": 0.0024345423962016913,
+        "ma_proximity_percent": 0.00653336961902664,
+        "fvg_lookback_bars": 9,
+        "fvg_fill_threshold": 0.6,
+        "volume_confirmation": true,
+        "timeframe_filter": "1h",
+        "volatility_adjustment": 0.7,
+        "trend_strength_min": 0.2,
+        "risk_adjustment": 1.0
+      },
+      "best_score": -1000.0,
+      "trials": 10,
+      "sampler": "CmaEsSampler"
     }
   },
   "pareto_solutions": [],
   "validation_results": {
-    "test_period": "2024-01-01 - 2024-12-31",
-    "symbols_tested": 10,
-    "symbols_with_data": 10,
-    "best_params": {
-      "ma_period": 5,
-      "fvg_min_gap": 0.010735410833940291,
-      "resistance_lookback": 5,
-      "breakout_threshold": 1.004,
-      "stop_loss_rate": 0.13573881728235276,
-      "target_profit_rate": 0.0014732847986821825,
-      "ma_proximity_percent": 0.005720234320483288,
-      "fvg_lookback_bars": 5,
-      "fvg_fill_threshold": 0.2,
-      "volume_confirmation": true,
-      "timeframe_filter": "1h",
-      "volatility_adjustment": 1.4,
-      "trend_strength_min": 0.05,
-      "risk_adjustment": 1.4000000000000001
-    },
-    "s1_comprehensive": {
-      "total_trades": 7,
-      "win_rate": 100.0,
-      "avg_return": 0.8274803451455547,
-      "median_return": 0.4787941292431688,
-      "sharpe_ratio": 1.5157054036312227,
-      "max_drawdown": 0.29124417010733955
-    },
-    "s2_comprehensive": {
-      "total_trades": 3,
-      "conversion_rate": 42.857142857142854,
-      "win_rate": 100.0,
-      "avg_return": 1.3921354350621509,
-      "median_return": 1.516333337309746
-    }
+    "error": "検証期間中にトレードが発生しませんでした"
   }
 }
