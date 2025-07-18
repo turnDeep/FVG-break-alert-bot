@@ -132,10 +132,10 @@ except ImportError:
 # グローバル関数として定義
 def _evaluate_single_symbol_wrapper(args):
     """並列処理のための独立した評価関数"""
-    symbol, basic_params, start_date, end_date, optimizer_instance_for_scoring = args
+    symbol, basic_params, start_date, end_date, cache_dir = args
     try:
         backtester = FVGBreakBacktest(**basic_params)
-        result = backtester.run_backtest(symbol, start_date, end_date)
+        result = backtester.run_backtest(symbol, start_date, end_date, cache_dir=cache_dir)
 
         if result.get('error'):
             return None
@@ -144,7 +144,7 @@ def _evaluate_single_symbol_wrapper(args):
         period_days = (pd.to_datetime(end_date) - pd.to_datetime(start_date)).days
 
         # optimizerインスタンス経由でスコア計算メソッドを呼び出す
-        score = optimizer_instance_for_scoring.calculate_enhanced_score(result, period_days)
+        score = EnhancedFVGParameterOptimizer.calculate_enhanced_score(result, period_days)
         return score
 
     except Exception:
@@ -186,26 +186,49 @@ class EnhancedFVGParameterOptimizer:
                 'refinement': {'n_trials': 30, 'sampler': CmaEsSampler(seed=42)}
             }
     
-    def get_sp500_symbols(self):
-        """S&P500銘柄リストを取得"""
+    def get_sp500_symbols(self, cache_dir="sp500_data"):
+        """S&P500銘柄リストを取得し、データをキャッシュする"""
+        os.makedirs(cache_dir, exist_ok=True)
+
         try:
             sp500 = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')[0]
             symbols = sp500['Symbol'].str.replace('.', '-').tolist()
-            
-            # 高速モードでは銘柄数を大幅に削減
-            if self.fast_mode:
-                return symbols[:10]  # 高速モード: 10銘柄のみ
-            elif self.unlimited_mode:
-                return symbols  # 無制限モード: 全銘柄
-            else:
-                return symbols[:50]  # 通常モード: 50銘柄
         except Exception as e:
             print(f"S&P500リスト取得エラー: {e}")
-            # フォールバック銘柄リスト（高流動性銘柄）
-            default_symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK-B', 'JPM', 'JNJ']
-            return default_symbols[:5] if self.fast_mode else default_symbols
+            symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK-B', 'JPM', 'JNJ']
 
-    def calculate_enhanced_score(self, result, period_days):
+        if self.fast_mode:
+            symbols = symbols[:10]
+        elif not self.unlimited_mode:
+            symbols = symbols[:50]
+
+        print(f"対象銘柄数: {len(symbols)}")
+
+        # データ取得とキャッシュ
+        for i in range(0, len(symbols), 30):
+            chunk = symbols[i:i+30]
+            print(f"銘柄 {i+1} から {i+len(chunk)} を取得中...")
+
+            for symbol in chunk:
+                cache_path = os.path.join(cache_dir, f"{symbol}.csv")
+                if not os.path.exists(cache_path):
+                    try:
+                        data = yf.download(symbol, start='2021-01-01', end='2025-01-01', progress=False, auto_adjust=False)
+                        if not data.empty:
+                            data.to_csv(cache_path)
+                    except Exception as e:
+                        print(f"エラー: {symbol} のデータ取得に失敗 - {e}")
+
+            if i + 30 < len(symbols):
+                print("レート制限回避のため60秒待機します...")
+                time.sleep(60)
+
+        # キャッシュされた有効なシンボルのみを返す
+        valid_symbols = [s for s in symbols if os.path.exists(os.path.join(cache_dir, f"{s}.csv"))]
+        return valid_symbols
+
+    @staticmethod
+    def calculate_enhanced_score(result, period_days):
         """過学習防止と品質重視の評価関数"""
         # エラーチェック
         if result.get('error') or 's1_stats' not in result:
@@ -353,7 +376,7 @@ class EnhancedFVGParameterOptimizer:
         except Exception:
             return -1000.0
 
-    def evaluate_parameters_parallel(self, params, symbols, start_date, end_date):
+    def evaluate_parameters_parallel(self, params, symbols, start_date, end_date, cache_dir="sp500_data"):
         """パラメータセットを並列処理で複数銘柄評価"""
         param_hash = hash(frozenset(params.items()))
         cache_key = f"{param_hash}_{start_date}_{end_date}"
@@ -375,7 +398,7 @@ class EnhancedFVGParameterOptimizer:
         else:
             sample_symbols = symbols[:min(len(symbols), 10)]
         
-        tasks = [(symbol, basic_params, start_date, end_date, self) for symbol in sample_symbols]
+        tasks = [(symbol, basic_params, start_date, end_date, cache_dir) for symbol in sample_symbols]
 
         scores = []
         try:
@@ -383,7 +406,7 @@ class EnhancedFVGParameterOptimizer:
                 results = executor.map(_evaluate_single_symbol_wrapper, tasks)
                 scores = [score for score in results if score is not None]
         except Exception:
-            return self.evaluate_parameters_sequential(params, symbols, start_date, end_date)
+            return self.evaluate_parameters_sequential(params, symbols, start_date, end_date, cache_dir)
 
         if not scores:
             result = -1000.0
@@ -393,7 +416,7 @@ class EnhancedFVGParameterOptimizer:
         self.cache[cache_key] = result
         return result
 
-    def evaluate_parameters_sequential(self, params, symbols, start_date, end_date):
+    def evaluate_parameters_sequential(self, params, symbols, start_date, end_date, cache_dir="sp500_data"):
         """パラメータセットを逐次処理で評価（フォールバック用）"""
         scores = []
         basic_params = {
@@ -412,9 +435,9 @@ class EnhancedFVGParameterOptimizer:
         for symbol in sample_symbols:
             try:
                 backtester = FVGBreakBacktest(**basic_params)
-                result = backtester.run_backtest(symbol, start_date, end_date)
+                result = backtester.run_backtest(symbol, start_date, end_date, cache_dir=cache_dir)
                 if not result.get('error'):
-                    score = self.calculate_enhanced_score(result, period_days)
+                    score = EnhancedFVGParameterOptimizer.calculate_enhanced_score(result, period_days)
                     scores.append(score)
             except Exception:
                 continue
@@ -647,14 +670,14 @@ class EnhancedFVGParameterOptimizer:
         
         return self.best_params
 
-    def comprehensive_validation(self, test_start='2024-01-01', test_end='2024-12-31'):
+    def comprehensive_validation(self, test_start='2024-01-01', test_end='2024-12-31', cache_dir="sp500_data"):
         """包括的な検証"""
         if not self.best_params:
             raise ValueError("最適化を先に実行してください")
         
         print(f"\n📊 包括的検証を開始 ({test_start} - {test_end})")
         
-        test_symbols = self.get_sp500_symbols()
+        test_symbols = self.get_sp500_symbols(cache_dir=cache_dir)
         
         # 基本パラメータのみでバックテスター作成
         basic_params = {
@@ -682,7 +705,7 @@ class EnhancedFVGParameterOptimizer:
         
         for symbol in validation_symbols:
             try:
-                result = backtester.run_backtest(symbol, test_start, test_end)
+                result = backtester.run_backtest(symbol, test_start, test_end, cache_dir=cache_dir)
                 if not result.get('error'):
                     all_results.append(result)
                     all_s1_trades.extend(result.get('strategy1_trades', []))
@@ -1106,7 +1129,8 @@ def main():
             optimizer.optimization_config[stage]['n_trials'] = args.n_trials
     
     # S&P500銘柄取得
-    symbols = optimizer.get_sp500_symbols()
+    cache_dir = "sp500_data"
+    symbols = optimizer.get_sp500_symbols(cache_dir=cache_dir)
     print(f"📊 対象銘柄数: {len(symbols)}")
     
     # 最適化実行
@@ -1142,7 +1166,7 @@ def main():
     # 検証実行
     print("\n📊 検証を実行中...")
     try:
-        validation_results = optimizer.comprehensive_validation('2024-01-01', '2024-12-31')
+        validation_results = optimizer.comprehensive_validation('2024-01-01', '2024-12-31', cache_dir=cache_dir)
         optimizer.validation_results = validation_results
     except Exception as e:
         print(f"検証エラー: {e}")
