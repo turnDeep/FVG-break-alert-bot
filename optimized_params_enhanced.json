@@ -1,59 +1,99 @@
 {
   "optimization_metadata": {
-    "timestamp": "20250718_133240",
+    "timestamp": "20250718_214748",
     "unlimited_mode": false,
     "optimization_config": {
       "exploration": {
-        "n_trials": 30,
+        "n_trials": 5,
         "sampler": "RandomSampler"
       },
       "exploitation": {
-        "n_trials": 20,
+        "n_trials": 5,
         "sampler": "TPESampler"
       },
       "refinement": {
-        "n_trials": 10,
+        "n_trials": 5,
         "sampler": "CmaEsSampler"
       }
     }
   },
   "best_params": {
-    "ma_period": 115,
-    "fvg_min_gap": 0.5977620423185935,
-    "resistance_lookback": 13,
-    "breakout_threshold": 1.012,
-    "stop_loss_rate": 0.018410831547550195,
-    "target_profit_rate": 0.05396223489590214,
-    "ma_proximity_percent": 0.10038682121444416,
-    "fvg_lookback_bars": 3,
-    "fvg_fill_threshold": 0.1,
+    "ma_period": 305,
+    "fvg_min_gap": 2.987605790786772,
+    "resistance_lookback": 37,
+    "breakout_threshold": 1.037,
+    "stop_loss_rate": 0.02287621127572781,
+    "target_profit_rate": 0.13729010541463973,
+    "ma_proximity_percent": 0.019086732760608988,
+    "fvg_lookback_bars": 7,
+    "fvg_fill_threshold": 0.2,
     "volume_confirmation": true,
     "timeframe_filter": "daily",
-    "volatility_adjustment": 1.0,
-    "trend_strength_min": 0.4,
-    "risk_adjustment": 1.1
+    "volatility_adjustment": 1.7000000000000002,
+    "trend_strength_min": 0.7000000000000001,
+    "risk_adjustment": 0.8
   },
   "multi_stage_results": {
     "exploration": {
       "best_params": {
-        "ma_period": 115,
-        "fvg_min_gap": 0.5977620423185935,
-        "resistance_lookback": 13,
-        "breakout_threshold": 1.012,
-        "stop_loss_rate": 0.018410831547550195,
-        "target_profit_rate": 0.05396223489590214,
-        "ma_proximity_percent": 0.10038682121444416,
-        "fvg_lookback_bars": 3,
-        "fvg_fill_threshold": 0.1,
+        "ma_period": 305,
+        "fvg_min_gap": 2.987605790786772,
+        "resistance_lookback": 37,
+        "breakout_threshold": 1.037,
+        "stop_loss_rate": 0.02287621127572781,
+        "target_profit_rate": 0.13729010541463973,
+        "ma_proximity_percent": 0.019086732760608988,
+        "fvg_lookback_bars": 7,
+        "fvg_fill_threshold": 0.2,
         "volume_confirmation": true,
         "timeframe_filter": "daily",
-        "volatility_adjustment": 1.0,
-        "trend_strength_min": 0.4,
-        "risk_adjustment": 1.1
+        "volatility_adjustment": 1.7000000000000002,
+        "trend_strength_min": 0.7000000000000001,
+        "risk_adjustment": 0.8
       },
-      "best_score": 381.7222282796624,
-      "trials": 12,
+      "best_score": -1000.0,
+      "trials": 5,
       "sampler": "RandomSampler"
+    },
+    "exploitation": {
+      "best_params": {
+        "ma_period": 305,
+        "fvg_min_gap": 2.987605790786772,
+        "resistance_lookback": 37,
+        "breakout_threshold": 1.037,
+        "stop_loss_rate": 0.02287621127572781,
+        "target_profit_rate": 0.13729010541463973,
+        "ma_proximity_percent": 0.019086732760608988,
+        "fvg_lookback_bars": 7,
+        "fvg_fill_threshold": 0.2,
+        "volume_confirmation": true,
+        "timeframe_filter": "daily",
+        "volatility_adjustment": 1.7000000000000002,
+        "trend_strength_min": 0.7000000000000001,
+        "risk_adjustment": 0.8
+      },
+      "best_score": -1000.0,
+      "trials": 5,
+      "sampler": "TPESampler"
+    },
+    "refinement": {
+      "best_params": {
+        "ma_period": 290,
+        "fvg_min_gap": 4.710976620058603,
+        "resistance_lookback": 43,
+        "breakout_threshold": 1.039,
+        "stop_loss_rate": 0.019741090580774834,
+        "target_profit_rate": 0.0852172082393636,
+        "ma_proximity_percent": 0.010343592824954551,
+        "fvg_lookback_bars": 9,
+        "fvg_fill_threshold": 0.30000000000000004,
+        "volatility_adjustment": 1.8000000000000003,
+        "trend_strength_min": 0.5,
+        "risk_adjustment": 1.0
+      },
+      "best_score": -1000.0,
+      "trials": 5,
+      "sampler": "CmaEsSampler"
     }
   },
   "pareto_solutions": [],

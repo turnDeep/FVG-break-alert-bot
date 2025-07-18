@@ -73,61 +73,66 @@ except ImportError:
     class FVGBreakBacktest:
         def __init__(self, **kwargs):
             self.params = kwargs
-            np.random.seed(42)  # 再現性のため
-        
+            np.random.seed(sum(ord(c) for c in str(kwargs))) # パラメータでシード変更
+
         def run_backtest(self, symbol, start_date, end_date):
-            # ダミーの結果を返す（よりリアルな分布）
-            # パラメータによって結果を変える
+            # 新しい統計構造に合わせたダミー結果
             ma_period = self.params.get('ma_period', 200)
             fvg_min_gap = self.params.get('fvg_min_gap', 0.5)
             
-            # パラメータに基づいてベースラインを調整
-            base_return = 0.001 + (200 - ma_period) * 0.00001 + fvg_min_gap * 0.001
-            base_win_rate = 50 + (ma_period - 100) * 0.05
+            base_win_rate = 50 + (200 - ma_period) * 0.05 + fvg_min_gap * 10
+            base_return = 0.001 + (fvg_min_gap - 0.5) * 0.002
+
+            s1_entries = np.random.randint(10, 50)
+            s2_entries = int(s1_entries * np.random.uniform(0.2, 0.6))
+            total_trades = s1_entries
             
-            # ランダム性を追加
-            trade_count = np.random.randint(20, 80)
-            win_rate = np.clip(base_win_rate + np.random.normal(0, 5), 30, 70)
-            avg_return = base_return + np.random.normal(0, 0.002)
+            final_trades = []
+            s2_transition_trades = []
             
-            # 戦略1のトレード生成
-            trades = []
-            for _ in range(trade_count):
+            # トレード生成
+            for i in range(total_trades):
+                is_s2 = i < s2_entries
+                win_rate = base_win_rate + (10 if is_s2 else 0) # S2は勝率が高いと仮定
+
+                trade = {'entry_date': pd.to_datetime(start_date) + timedelta(days=i*5)}
                 if np.random.random() < win_rate / 100:
-                    trades.append({'return': np.random.uniform(0.001, 0.03)})
+                    trade['return'] = np.random.uniform(base_return, base_return + 0.03)
                 else:
-                    trades.append({'return': np.random.uniform(-0.02, -0.001)})
-            
-            # 戦略2のトレード（一部を変換）
-            s2_trades = []
-            s2_count = int(trade_count * np.random.uniform(0.1, 0.3))
-            for i in range(s2_count):
-                trades[i]['s2_triggered'] = True
-                if np.random.random() < 0.6:  # 戦略2の勝率
-                    s2_trades.append({'return': np.random.uniform(0.005, 0.05)})
+                    trade['return'] = np.random.uniform(base_return - 0.02, base_return)
+
+                if is_s2:
+                    trade['status'] = 'strategy2'
+                    s2_transition_trades.append(trade)
                 else:
-                    s2_trades.append({'return': np.random.uniform(-0.015, -0.005)})
-            
-            returns = [t['return'] for t in trades]
-            s2_returns = [t['return'] for t in s2_trades]
-            
+                    trade['status'] = 'strategy1'
+
+                final_trades.append(trade)
+
+            all_returns = [t['return'] for t in final_trades]
+            s2_returns = [t['return'] for t in final_trades if t['status'] == 'strategy2']
+
             return {
                 'error': False,
-                'avg_return': np.mean(returns) if returns else 0,
-                'max_loss': min(returns) if returns else 0,
+                'total_trades': total_trades,
+                'win_rate': sum(1 for r in all_returns if r > 0) / total_trades * 100,
+                'avg_return': np.mean(all_returns) if all_returns else 0,
+                'max_loss': min(all_returns) if all_returns else 0,
                 's1_stats': {
-                    'count': trade_count,
-                    'win_rate': win_rate,
-                    'avg_return': np.mean(returns) if returns else 0
+                    'entry_count': s1_entries,
                 },
                 's2_stats': {
-                    'count': s2_count,
+                    'entry_count': s2_entries,
+                    'conversion_rate': s2_entries / s1_entries * 100,
                     'win_rate': (sum(1 for r in s2_returns if r > 0) / len(s2_returns) * 100) if s2_returns else 0,
                     'avg_return': np.mean(s2_returns) if s2_returns else 0,
-                    'conversion_rate': (s2_count / trade_count * 100) if trade_count > 0 else 0
                 },
-                'strategy1_trades': trades,
-                'strategy2_trades': s2_trades
+                'strategy1_final_trades': final_trades,
+                'strategy2_transition_trades': s2_transition_trades,
+                'debug_info': {
+                    'strategy1_entries': s1_entries,
+                    'strategy2_entries': s2_entries
+                }
             }
 
 # グローバル関数として定義
@@ -206,85 +211,70 @@ class EnhancedFVGParameterOptimizer:
 
     @staticmethod
     def calculate_enhanced_score(result, period_days):
-        """過学習防止と品質重視の評価関数"""
-        # エラーチェック
-        if result.get('error') or 's1_stats' not in result:
+        """新しい戦略に最適化された評価関数"""
+        if result.get('error') or 's1_stats' not in result or 's2_stats' not in result:
             return -1000
-            
+
         s1_stats = result['s1_stats']
-        s2_stats = result.get('s2_stats', {})
+        s2_stats = result['s2_stats']
+        total_trades = result.get('total_trades', 0)
 
-        if s1_stats.get('count', 0) == 0:
-            return -100  # トレードがない場合のペナルティを軽減
+        if total_trades == 0:
+            return -100
 
-        # 基本スコア: 平均リターン × 勝率
-        avg_return = s1_stats.get('avg_return', 0)
-        win_rate = s1_stats.get('win_rate', 0) / 100
-        s1_score = avg_return * win_rate
+        # --- 戦略2のパフォーマンスを最重要視 ---
+        s2_win_rate = s2_stats.get('win_rate', 0) / 100.0
+        s2_avg_return = s2_stats.get('avg_return', 0) / 100.0
+        s2_score = (s2_avg_return * s2_win_rate) * s2_stats.get('entry_count', 0)
         
-        # 戦略2のスコア
-        s2_score = 0
-        if s2_stats.get('count', 0) > 0:
-            s2_avg_return = s2_stats.get('avg_return', 0)
-            s2_win_rate = s2_stats.get('win_rate', 0) / 100
-            s2_score = s2_avg_return * s2_win_rate
-
-        # 戦略1: 40%, 戦略2: 60%の重み付け
-        base_score = (s1_score * 0.4) + (s2_score * 0.6)
+        # --- 全体的なパフォーマンス ---
+        overall_win_rate = result.get('win_rate', 0) / 100.0
+        overall_avg_return = result.get('avg_return', 0) / 100.0
         
-        # スコアを100倍してより見やすい値にする
-        base_score *= 100
+        # プロフィットファクターのような指標
+        returns = [t.get('return', 0) for t in result.get('strategy1_final_trades', [])]
+        total_profit = sum(r for r in returns if r > 0)
+        total_loss = abs(sum(r for r in returns if r < 0))
+        profit_factor = total_profit / (total_loss + 1e-6)
 
-        # 過学習防止のための正則化項
-        returns = [t.get('return', 0) for t in result.get('strategy1_trades', [])]
+        # --- スコアの組み立て ---
+        # 戦略2のスコアに高い重み (70%)、全体スコアに (30%)
+        base_score = (s2_score * 0.7) + (overall_avg_return * overall_win_rate * 0.3)
+        base_score *= 1000 # スコアを拡大
+
+        # --- 正則化とボーナス ---
+        # 1. シャープレシオ（安定性）
         if len(returns) > 1:
-            # シャープレシオ（年率化）
             returns_array = np.array(returns)
-            daily_mean = np.mean(returns_array)
             daily_std = np.std(returns_array)
             if daily_std > 0:
-                sharpe_ratio = (daily_mean / daily_std) * np.sqrt(252)  # 年率化
-                base_score += sharpe_ratio * 2
-            
-            # 連続損失耐性
-            consecutive_losses = 0
-            max_consecutive_losses = 0
-            for ret in returns:
-                if ret < 0:
-                    consecutive_losses += 1
-                    max_consecutive_losses = max(max_consecutive_losses, consecutive_losses)
-                else:
-                    consecutive_losses = 0
-            
-            if max_consecutive_losses > 5:
-                base_score -= (max_consecutive_losses - 5) * 0.5  # ペナルティを軽減
+                # リスクフリーレート0と仮定
+                sharpe_ratio = (np.mean(returns_array) / daily_std) * np.sqrt(252)
+                base_score += sharpe_ratio * 5 # シャープレシオの影響を大きく
 
-        # 戦略2転換率ボーナス
-        conversion_rate = s2_stats.get('conversion_rate', 0)
-        base_score += conversion_rate * 0.05  # ボーナスを調整
+        # 2. 戦略2への転換率ボーナス
+        conversion_rate = s2_stats.get('conversion_rate', 0) / 100.0
+        # 転換率が高いほどボーナス。ただし高すぎるとS1の意味がなくなるのでキャップ
+        base_score += min(conversion_rate, 0.8) * 10
 
-        # 適度な取引頻度の重視（期間に応じてスケーリング）
-        trade_count = s1_stats.get('count', 0)
+        # 3. プロフィットファクターボーナス
+        base_score += (profit_factor - 1) * 5
 
-        # 年間基準値を設定
-        ANNUAL_MIN_TRADES = 20
-        ANNUAL_MAX_TRADES = 300
+        # 4. トレード頻度のペナルティ
+        ANNUAL_MIN_TRADES = 10
+        ANNUAL_MAX_TRADES = 150
+        min_trades = (ANNUAL_MIN_TRADES / 365.0) * period_days
+        max_trades = (ANNUAL_MAX_TRADES / 365.0) * period_days
 
-        # 期間に応じただしきい値を計算
-        min_trades_threshold = (ANNUAL_MIN_TRADES / 365.0) * period_days
-        max_trades_threshold = (ANNUAL_MAX_TRADES / 365.0) * period_days
+        if total_trades < min_trades:
+            base_score -= (min_trades - total_trades) * 1.0 # 強いペナルティ
+        elif total_trades > max_trades:
+            base_score -= (total_trades - max_trades) * 0.2 # 弱いペナルティ
 
-        if trade_count < min_trades_threshold:
-            # しきい値より少ない場合、差分に応じてペナルティ
-            base_score -= (min_trades_threshold - trade_count) * 0.1
-        elif trade_count > max_trades_threshold:
-            # しきい値より多い場合、差分に応じてペナルティ
-            base_score -= (trade_count - max_trades_threshold) * 0.05
-
-        # 最大損失ペナルティ
-        max_loss = result.get('max_loss', 0)
-        if max_loss < -15:
-            base_score -= abs(max_loss) * 0.1  # ペナルティを軽減
+        # 5. 最大損失ペナルティ
+        max_loss = result.get('max_loss', 0) / 100.0
+        if max_loss < -0.10: # 10%以上の損失でペナルティ
+            base_score -= (abs(max_loss) - 0.10) * 100
 
         return base_score
 
@@ -415,14 +405,15 @@ class EnhancedFVGParameterOptimizer:
                 backtester = FVGBreakBacktest(**basic_params)
                 result = backtester.run_backtest(symbol, start_date, end_date)
 
-                if i < 1: # 最初の銘柄のデバッグ情報のみ表示
+                if i < 1:  # 最初の銘柄のデバッグ情報のみ表示
                     print(f"--- Debug Info for {symbol} ---")
                     if result.get('error'):
                         print(f"Error: {result['error']}")
                     else:
-                        print(f"Trades S1: {len(result.get('strategy1_trades', []))}")
-                        print(f"Trades S2: {len(result.get('strategy2_trades', []))}")
-                        print(f"Debug Stats: {result.get('debug_info', {})}")
+                        print(f"Total Trades: {result.get('total_trades', 0)}")
+                        print(f"Win Rate: {result.get('win_rate', 0):.2f}%")
+                        print(f"S1 Entries: {result.get('debug_info', {}).get('strategy1_entries', 0)}")
+                        print(f"S2 Entries: {result.get('debug_info', {}).get('strategy2_entries', 0)}")
 
                 if not result.get('error'):
                     score = EnhancedFVGParameterOptimizer.calculate_enhanced_score(result, period_days)
@@ -1096,26 +1087,36 @@ Best Parameters:
         if hasattr(self, 'validation_results') and self.validation_results:
             vr = self.validation_results
             if not vr.get('error'):
+                s1_comp = vr.get('s1_comprehensive', {})
+                s2_comp = vr.get('s2_comprehensive', {})
                 html_content += f"""
+            <h4>Overall Performance</h4>
             <table>
-                <tr><th>Metric</th><th>Strategy 1</th><th>Strategy 2</th></tr>
-                <tr><td>Total Trades</td><td>{vr['s1_comprehensive']['total_trades']}</td><td>{vr['s2_comprehensive']['total_trades']}</td></tr>
-                <tr><td>Win Rate</td><td>{vr['s1_comprehensive']['win_rate']:.2f}%</td><td>{vr['s2_comprehensive']['win_rate']:.2f}%</td></tr>
-                <tr><td>Avg Return</td><td>{vr['s1_comprehensive']['avg_return']:.2f}%</td><td>{vr['s2_comprehensive']['avg_return']:.2f}%</td></tr>
-                <tr><td>Sharpe Ratio</td><td>{vr['s1_comprehensive']['sharpe_ratio']:.3f}</td><td>-</td></tr>
-                <tr><td>Max Drawdown</td><td>{vr['s1_comprehensive']['max_drawdown']:.2f}%</td><td>-</td></tr>
+                <tr><th>Metric</th><th>Value</th></tr>
+                <tr><td>Total Trades</td><td>{s1_comp.get('total_trades', 'N/A')}</td></tr>
+                <tr><td>Win Rate</td><td>{s1_comp.get('win_rate', 0):.2f}%</td></tr>
+                <tr><td>Avg Return</td><td>{s1_comp.get('avg_return', 0):.2f}%</td></tr>
+                <tr><td>Sharpe Ratio</td><td>{s1_comp.get('sharpe_ratio', 0):.3f}</td></tr>
+                <tr><td>Max Drawdown</td><td>{s1_comp.get('max_drawdown', 0):.2f}%</td></tr>
+            </table>
+            <h4>Strategy 2 (Breakout) Performance</h4>
+            <table>
+                <tr><th>Metric</th><th>Value</th></tr>
+                <tr><td>Conversion Rate</td><td>{s2_comp.get('conversion_rate', 0):.2f}%</td></tr>
+                <tr><td>S2 Win Rate</td><td>{s2_comp.get('win_rate', 0):.2f}%</td></tr>
+                <tr><td>S2 Avg Return</td><td>{s2_comp.get('avg_return', 0):.2f}%</td></tr>
             </table>
 """
             else:
                 html_content += f"""
             <div class="warning">
-                <p><strong>検証エラー:</strong> {html.escape(vr['error'])}</p>
+                <p><strong>Validation Error:</strong> {html.escape(vr['error'])}</p>
             </div>
 """
         else:
             html_content += """
             <div class="warning">
-                <p>検証結果がありません。comprehensive_validation()を実行してください。</p>
+                <p>No validation results. Please run comprehensive_validation().</p>
             </div>
 """
         
