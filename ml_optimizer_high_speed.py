@@ -140,8 +140,11 @@ def _evaluate_single_symbol_wrapper(args):
         if result.get('error'):
             return None
 
+        # 期間の日数を計算
+        period_days = (pd.to_datetime(end_date) - pd.to_datetime(start_date)).days
+
         # optimizerインスタンス経由でスコア計算メソッドを呼び出す
-        score = optimizer_instance_for_scoring.calculate_enhanced_score(result)
+        score = optimizer_instance_for_scoring.calculate_enhanced_score(result, period_days)
         return score
 
     except Exception:
@@ -202,7 +205,7 @@ class EnhancedFVGParameterOptimizer:
             default_symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK-B', 'JPM', 'JNJ']
             return default_symbols[:5] if self.fast_mode else default_symbols
 
-    def calculate_enhanced_score(self, result):
+    def calculate_enhanced_score(self, result, period_days):
         """過学習防止と品質重視の評価関数"""
         # エラーチェック
         if result.get('error') or 's1_stats' not in result:
@@ -260,12 +263,23 @@ class EnhancedFVGParameterOptimizer:
         conversion_rate = s2_stats.get('conversion_rate', 0)
         base_score += conversion_rate * 0.05  # ボーナスを調整
 
-        # 適度な取引頻度の重視
+        # 適度な取引頻度の重視（期間に応じてスケーリング）
         trade_count = s1_stats.get('count', 0)
-        if trade_count < 10:
-            base_score -= (10 - trade_count) * 0.2  # ペナルティを軽減
-        elif trade_count > 100:
-            base_score -= (trade_count - 100) * 0.01  # ペナルティを軽減
+
+        # 年間基準値を設定
+        ANNUAL_MIN_TRADES = 20
+        ANNUAL_MAX_TRADES = 300
+
+        # 期間に応じただしきい値を計算
+        min_trades_threshold = (ANNUAL_MIN_TRADES / 365.0) * period_days
+        max_trades_threshold = (ANNUAL_MAX_TRADES / 365.0) * period_days
+
+        if trade_count < min_trades_threshold:
+            # しきい値より少ない場合、差分に応じてペナルティ
+            base_score -= (min_trades_threshold - trade_count) * 0.1
+        elif trade_count > max_trades_threshold:
+            # しきい値より多い場合、差分に応じてペナルティ
+            base_score -= (trade_count - max_trades_threshold) * 0.05
 
         # 最大損失ペナルティ
         max_loss = result.get('max_loss', 0)
@@ -393,13 +407,14 @@ class EnhancedFVGParameterOptimizer:
         }
         
         sample_symbols = symbols[:min(len(symbols), 10)]
+        period_days = (pd.to_datetime(end_date) - pd.to_datetime(start_date)).days
         
         for symbol in sample_symbols:
             try:
                 backtester = FVGBreakBacktest(**basic_params)
                 result = backtester.run_backtest(symbol, start_date, end_date)
                 if not result.get('error'):
-                    score = self.calculate_enhanced_score(result)
+                    score = self.calculate_enhanced_score(result, period_days)
                     scores.append(score)
             except Exception:
                 continue
